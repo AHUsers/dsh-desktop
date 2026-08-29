@@ -912,7 +912,7 @@ virtualStoreDirMaxLength: 60
     expect(readFileSync(path, 'utf8')).toBe(content)
   })
 
-  it('keeps the Windows browse panel, official agent presets, and desktop pwsh provider', () => {
+  it('keeps the Windows browse panel, official subprocess and presets, and desktop pwsh provider', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'cordis.patch.yml'), [
       '- id: pwsh-sandbox',
@@ -943,12 +943,8 @@ virtualStoreDirMaxLength: 60
     expect(rows.find(row => row.id === 'subprocess')).toEqual({
       id: 'subprocess',
       name: '@deepseek-ai/dsh-subprocess-local',
-      disabled: true,
     })
-    expect(rows).toContainEqual(expect.objectContaining({
-      id: 'desktop-windows-subprocess',
-      name: 'dsh-plugin-desktop/windows-subprocess',
-    }))
+    expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
     expect(rows.find(row => row.id === 'sandbox')).toEqual({
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
