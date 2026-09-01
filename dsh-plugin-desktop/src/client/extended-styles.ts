@@ -135,6 +135,7 @@ body[data-dsh-desktop-mode="extended"]:not([data-dsh-desktop-material="off"]) {
   pointer-events: none;
 }
 .dshDesktopFrameProduct { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dshDesktopSidebarBrandName { white-space: nowrap; }
 .dshDesktopFrameVersion {
   min-height: 22px;
   padding: 2px 5px;

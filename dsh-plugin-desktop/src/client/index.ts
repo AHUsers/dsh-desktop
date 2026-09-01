@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
 import { startRendererBootReporter } from './boot-health.ts'
+import { applyDesktopSidebarBrand, installDesktopHeroCleanup } from './desktop-brand.tsx'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
@@ -91,6 +92,14 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(
     () => startRendererBootReporter(ctx.loader),
     'dsh-plugin-desktop: renderer boot health report',
+  )
+  ctx.effect(
+    () => applyDesktopSidebarBrand(ctx),
+    'dsh-plugin-desktop: sidebar brand override',
+  )
+  ctx.effect(
+    () => installDesktopHeroCleanup(),
+    'dsh-plugin-desktop: hero headline cleanup',
   )
   if (environment.platform === 'win32') {
     ctx.effect(
