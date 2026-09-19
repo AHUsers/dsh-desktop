@@ -121,6 +121,17 @@ function createHarness() {
 }
 
 describe('community market Host capability lifecycle', () => {
+  it('exposes restart independently when a shell has no terminal integration', async () => {
+    const harness = createHarness()
+    apply(harness.context as never)
+    harness.provide('desktopActions', { requestRestart: vi.fn(async () => {}) })
+    harness.provide('desktopProfiles', { current: { name: 'next', dir: 'C:/fixture-profile' } })
+    harness.provide('desktopPnpm', {})
+    await expect(harness.request(marketRoutes.state)).resolves.toMatchObject({
+      body: { desktopActions: { openTerminal: false, requestRestart: true } },
+    })
+    harness.dispose()
+  })
   it('keeps desktop routes fail-closed until capabilities are live and after they are disposed', async () => {
     const harness = createHarness()
     apply(harness.context as never)

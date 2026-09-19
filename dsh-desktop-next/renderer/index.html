@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DSH Desktop Next</title><link rel="stylesheet" href="shell.css"></head>
+<body><main>
+<p class="eyebrow">DSH DESKTOP NEXT · 实验版</p><h1>Profile 与附加功能</h1>
+<p id="status" role="status">正在读取状态…</p><pre id="error" role="alert" hidden></pre>
+<section><h2>工作环境</h2><label for="profiles">当前 Profile</label><div class="row"><select id="profiles"></select><button id="switch">切换</button></div>
+<form id="create"><label for="name">新建 Profile</label><div class="row"><input id="name" required maxlength="64" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*" placeholder="例如 work"><button type="submit">创建</button></div></form>
+<p class="hint">Profile 分别管理插件与补丁。对话、设置等数据遵循上游规则，在同一 Next 数据目录内共享。</p></section>
+<section><h2>附加功能</h2><label class="check"><input type="checkbox" id="market">社区市场</label><p class="hint">沿用现有的插件发现、安装预览和安装确认流程。</p>
+<label class="check"><input type="checkbox" id="remote">手机远控</label><p class="hint">启用后，在主界面的“手机连接”中完成配置。远程使用时，这台电脑需要保持开机并联网。</p>
+<button id="save">应用并重启 Host</button></section>
+<section><h2>恢复</h2><p class="hint">启动失败时，可禁用第三方插件、AA 和市场，备份当前 Profile 补丁后重启。已安装的插件文件、会话和全局补丁会保留。</p>
+<div class="row"><button id="restart">重启 Host</button><button id="recover">禁用插件并恢复…</button></div></section>
+<p id="home" class="hint"></p><button id="refresh" class="secondary">刷新状态</button>
+</main><script src="shell.js"></script></body></html>
