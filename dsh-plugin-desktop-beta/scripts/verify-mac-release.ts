@@ -83,7 +83,7 @@ export function verifyMacRelease(
     for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])
       if (entry.path.endsWith('/bin/uv')) {
-        options.run('/usr/bin/test', ['-x', join(unpackedRoot, entry.path)])
+        options.run('/bin/test', ['-x', join(unpackedRoot, entry.path)])
         if (entry.arch === (process.arch === 'x64' ? 'x86_64' : process.arch)) {
           options.run(join(unpackedRoot, entry.path), ['--version'])
         }
@@ -123,7 +123,7 @@ if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.m
     const verified = verifyMacRelease()
     console.log(`macOS release verification passed: ${verified.dmgPath}`)
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
+    console.error(error)
     process.exitCode = 1
   }
 }
