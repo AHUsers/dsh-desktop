@@ -107,6 +107,12 @@ jobs:
           NODE
       - if: needs.changes.outputs.product == 'true'
         run: yarn check
+      - name: Install Chromium for Next window regression
+        if: needs.changes.outputs.product == 'true'
+        run: yarn workspace dsh-desktop-next exec playwright install --with-deps chromium
+      - name: Verify Next window controls in the official frontend
+        if: needs.changes.outputs.product == 'true'
+        run: yarn workspace dsh-desktop-next verify:window-controls
 
   # Windows-only logic and unsigned NSIS/portable builds on a real Windows runner:
   # updates, window options, pwsh sandbox, volume diagnostics, and packaging.
