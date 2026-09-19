@@ -6,6 +6,7 @@ export function desktopMenu(state: DesktopState, language: string, show: () => v
   const t = (zh: string, en: string): string => language.startsWith('zh') ? zh : en
   const action = (label: string, type: DesktopCommand['type'], enabled = true): MenuItemConstructorOptions => ({
     label, enabled: enabled && (!state.busy || type === 'controls'), click: () => run({ type } as DesktopCommand),
+    ...(type === 'controls' ? { accelerator: 'CmdOrCtrl+,' } : {}),
   })
   return [
     { label: t('打开 DSH Desktop Next', 'Open DSH Desktop Next'), click: show },
@@ -29,6 +30,6 @@ export function desktopMenu(state: DesktopState, language: string, show: () => v
     ] },
     { type: 'separator' },
     { label: `Next ${state.version} · ${t('开发版，暂无自动更新', 'Development build; no update channel')}`, enabled: false },
-    { label: t('退出', 'Quit'), click: () => run({ type: 'quit' }) },
+    { label: t('退出', 'Quit'), accelerator: 'CmdOrCtrl+Q', click: () => run({ type: 'quit' }) },
   ]
 }

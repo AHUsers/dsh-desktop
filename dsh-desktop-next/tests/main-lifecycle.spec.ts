@@ -76,6 +76,8 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
     const window = fixture.windows[0]
     const tray = fixture.trays[0]
+    expect(tray.menu.at(-1).accelerator).toBe('CmdOrCtrl+Q')
+    expect(tray.menu.some((item: any) => item.accelerator === 'CmdOrCtrl+,')).toBe(true)
     const preventDefault = vi.fn()
     window.visible = true
     window.emit('close', { preventDefault })
