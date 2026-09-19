@@ -1,6 +1,6 @@
 /** Official Desktop boot in headless Chromium; simulated IPC/platform, no native window or user profile. */
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { DesktopHostProcess } from '../lib/host-process.js'
 import { NextProfiles } from '../lib/profiles.js'
 import { authenticateWebHost, serveWebDocument } from '../lib/web-document.js'
+import { DESKTOP_CONTROLS_CSS } from '../lib/controls-styles.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const require = createRequire(import.meta.url)
@@ -39,6 +40,25 @@ try {
   // Chromium classifies the intercepted document separately from its loopback Host.
   await context.grantPermissions(['local-network-access'], { origin: streamBaseUrl })
   await context.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])
+  const controlCommands = []
+  const controlState = {
+    selected: 'default', profiles: ['default', 'work'], features: { market: false, remoteControl: false },
+    preferences: { closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off', browserAccess: false,
+      networkExposure: 'loopback', port: 0, lanPort: 0, logLevel: 'info', notifications: true,
+      turnCompleted: true, turnFailed: true, jobCompleted: true, jobFailed: true },
+    phase: 'ready', busy: false, failure: '', safeMode: false, home: '[temporary test home]', platform: 'darwin',
+    version: '0.1.0-dev.0', trayAvailable: true, notificationsAvailable: true, windowsMicaSupported: false, browserUrl: null, lan: null,
+    checkpoint: { created: new Date().toISOString() }, logs: 'Headless UI fixture; native actions are recorded only.',
+  }
+  await context.exposeFunction('__nextTestState', () => structuredClone(controlState))
+  await context.exposeFunction('__nextTestCommand', command => {
+    controlCommands.push(command)
+    if (command.type === 'preferences') controlState.preferences = command.preferences
+    if (command.type === 'switch') controlState.selected = command.name
+  })
+  await context.addInitScript(() => {
+    window.desktopNext = { state: () => window.__nextTestState(), command: command => window.__nextTestCommand(command) }
+  })
   // Serve the Desktop document without the browser Host's inline injections.
   // The published entry must request them through its Desktop boot contract.
   await context.route(streamBaseUrl + '/', route => route.fulfill({ contentType: 'text/html', body: desktopDocument }))
@@ -132,9 +152,59 @@ try {
     await drag.waitFor({ state: 'hidden' })
     await reopen.waitFor({ state: 'hidden' })
   }
+  await page.evaluate(() => { document.documentElement.dataset.platform = 'darwin' })
+  await page.getByRole('button', { name: /^(设置|Settings)$/ }).click()
+  await page.getByRole('button', { name: /^(桌面|Desktop)$/ }).click()
+  const settings = page.locator('[data-next-desktop-settings]')
+  await settings.getByRole('heading', { name: /^(桌面设置|Desktop settings)$/ }).waitFor()
+  const closeToTray = settings.locator('[data-preference="closeToTray"]')
+  assert.equal(await closeToTray.isChecked(), true)
+  await closeToTray.uncheck()
+  // Status polling must not overwrite unsaved preferences.
+  await settings.locator('[data-refresh]').click()
+  assert.equal(await closeToTray.isChecked(), false)
+  await settings.getByRole('button', { name: /^(保存桌面设置|Save desktop settings)$/ }).click()
+  await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-preference="closeToTray"]').checked === false)
+  assert.ok(controlCommands.some(command => command.type === 'preferences' && !command.preferences.closeToTray))
+  await settings.getByRole('heading', { name: /^(桌面设置|Desktop settings)$/ }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(screenshots, 'desktop-settings.png'), animations: 'disabled' })
+  await settings.locator('[data-tab="profiles"]').click()
+  await settings.locator('[data-profiles]').selectOption('work')
+  await settings.locator('[data-command="switch"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-status]').textContent.startsWith('work'))
+  assert.deepEqual(controlCommands.at(-1), { type: 'switch', name: 'work' })
+
+  // Serve the exact independent recovery artifact with no Host or client boot.
+  const recoveryPage = await context.newPage()
+  const recoveryErrors = []
+  recoveryPage.on('pageerror', error => recoveryErrors.push(error.message))
+  controlState.phase = 'error'; controlState.failure = 'Fixture: invalid Profile manifest <script>unsafe()</script>'
+  await recoveryPage.route('http://next-recovery.test/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/shell.css') return route.fulfill({ contentType: 'text/css', body: DESKTOP_CONTROLS_CSS })
+    if (path === '/shell.js') return route.fulfill({ contentType: 'text/javascript', body: readFileSync(join(root, 'lib', 'shell.js'), 'utf8') })
+    return route.fulfill({ contentType: 'text/html', body: readFileSync(join(root, 'renderer', 'index.html'), 'utf8'),
+      headers: { 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'" } })
+  })
+  await recoveryPage.goto('http://next-recovery.test/')
+  await recoveryPage.locator('[data-page="recovery"]').waitFor({ state: 'visible' })
+  assert.equal(await recoveryPage.locator('[data-failure]').textContent(), controlState.failure)
+  assert.equal(await recoveryPage.locator('[data-failure] script').count(), 0)
+  await recoveryPage.locator('[data-command="safe-mode"]').click()
+  assert.equal(controlCommands.at(-1).type, 'safe-mode')
+  assert.equal(await recoveryPage.locator('[data-command="normal-mode"]').isDisabled(), true)
+  await recoveryPage.screenshot({ path: join(screenshots, 'recovery-assistant.png'), animations: 'disabled', fullPage: true })
+  assert.deepEqual(recoveryErrors, [])
+  await recoveryPage.close()
+  controlState.safeMode = true
+  await page.reload()
+  await page.locator('.dshNextSafeModeNotice').waitFor({ state: 'visible' })
+  await page.getByRole('button', { name: /^(稍后配置|Configure later)$/ }).click()
+  await page.locator('.dshNextSafeModeNotice button').click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'controls', page: 'recovery' })
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
-  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation. Chromium simulates the preload contract; native Electron window movement is not tested.')
+  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Desktop Settings registration, unsaved preference preservation, Profile actions, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
   console.log(`Screenshots: ${screenshots}`)
 } catch (error) {
   if (page && !page.isClosed()) {

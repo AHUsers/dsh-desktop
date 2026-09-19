@@ -5,11 +5,15 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { readProfilePlugins, type ProfilePnpmInvocation } from '@deepseek-ai/dsh-app-boot'
+import { installNotifications } from './notifications.ts'
 
 export const name = 'desktop-next-capabilities'
 export const inject = ['profileContext']
 
 export function apply(ctx: Context): void {
+  if (process.send) installNotifications(ctx, outcome => {
+    if (process.connected) process.send?.({ type: 'notification', outcome }, () => {})
+  })
   const profile = ctx.profileContext
   const invocation = profile.packageManager
   if (!invocation) throw new Error('Next requires its bundled pnpm invocation')
@@ -27,6 +31,10 @@ export function apply(ctx: Context): void {
       }),
   })
   if (process.send) ctx.provide('desktopActions', {
+    ...(process.platform === 'darwin' || process.platform === 'win32' ? { openTerminal: () => {
+      if (!process.connected || !process.send) throw new Error('Next shell is unavailable')
+      process.send({ type: 'desktop-action', action: 'terminal' }, () => {})
+    } } : {}),
     requestRestart: () => new Promise<void>((resolve, reject) => {
       if (!process.connected || !process.send) { reject(new Error('Next shell is unavailable')); return }
       process.send({ type: 'desktop-action', action: 'restart' }, error => error ? reject(error) : resolve())

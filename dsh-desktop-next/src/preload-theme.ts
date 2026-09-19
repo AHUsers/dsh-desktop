@@ -1,4 +1,4 @@
-/** Mirrors the Web UI's theme source into the macOS native theme so window vibrancy follows the app palette. */
+/** Mirrors the Web UI's theme source into the native theme so window vibrancy follows the app palette. */
 
 import { ipcRenderer } from 'electron'
 import { IPC as DESKTOP_IPC } from './ipc.ts'
@@ -7,14 +7,14 @@ import { IPC as DESKTOP_IPC } from './ipc.ts'
 const THEME_SOURCE_ATTRIBUTE = 'data-ds-theme-source'
 
 /**
- * On macOS, watches `html[data-ds-theme-source]` and forwards each value to
- * the main process, which sets `nativeTheme.themeSource` — the sidebar
- * vibrancy material then follows the app's theme preference instead of the
+ * On macOS and Windows, watches `html[data-ds-theme-source]` and forwards each value to
+ * the main process, which sets `nativeTheme.themeSource` — the native
+ * backdrop then follows the app's theme preference instead of the
  * OS appearance, while `system` keeps following the OS. Other platforms
  * never send.
  */
 export function syncNativeTheme(): void {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== 'darwin' && process.platform !== 'win32') return
   let sent: string | undefined
   const send = (): void => {
     const value = document.documentElement.getAttribute(THEME_SOURCE_ATTRIBUTE)

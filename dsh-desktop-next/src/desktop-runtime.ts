@@ -1,0 +1,187 @@
+/** Headless owner of the Host, desktop preferences, Profiles and recovery. */
+import { randomBytes } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { DesktopBackendController } from './backend-controller.ts'
+import { DesktopHostProcess } from './host-process.ts'
+import { DesktopPreferenceStore, parsePreferences } from './desktop-preferences.ts'
+import { DEFAULT_FEATURES, NextProfiles } from './profiles.ts'
+import { DEFAULT_PREFERENCES, type DesktopPreferences, type DesktopState, type NotificationOutcome } from './desktop-contract.ts'
+import { DesktopDiagnostics } from './diagnostics.ts'
+import { NextRecovery } from './recovery.ts'
+import { maskSecrets } from './mask-secrets.ts'
+import { privateDirectory } from './private-files.ts'
+import { authenticateWebHost } from './web-document.ts'
+import { DesktopLanHttpsRuntime } from './lan-https-runtime.ts'
+import type { DesktopLanHttpsCertificate } from './lan-https-certificate.ts'
+
+interface RuntimeOptions {
+  home: string
+  root: string
+  executable: string
+  addresses(): string[]
+  certificate(addresses: readonly string[]): Promise<DesktopLanHttpsCertificate>
+  onFailure(): void
+  onChange(): void
+  onRestart(): void
+  onTerminal(): void
+  onNotification(outcome: NotificationOutcome): void
+}
+
+export class NextDesktopRuntime {
+  readonly profiles: NextProfiles
+  readonly recovery: NextRecovery
+  readonly settings: DesktopPreferenceStore
+  readonly diagnostics: DesktopDiagnostics
+  readonly backend: DesktopBackendController<{ start(): Promise<void>; stop(): Promise<void> }>
+  preferences: DesktopPreferences = { ...DEFAULT_PREFERENCES }
+  selected = 'default'
+  safeMode = false
+  busy = false
+  closing = false
+  failure = ''
+  startup: Promise<void> = Promise.resolve()
+  /** Main-process transport only; never copied into a DesktopState. */
+  auth: { url: string; cookie: string; token: string; injections: readonly unknown[] } | undefined
+  lan: DesktopLanHttpsRuntime | undefined
+  private safeHome: string | undefined
+
+  constructor(readonly options: RuntimeOptions) {
+    this.profiles = new NextProfiles(options.home)
+    this.recovery = new NextRecovery(this.profiles)
+    this.settings = new DesktopPreferenceStore(options.home)
+    this.diagnostics = new DesktopDiagnostics(options.home)
+    this.backend = new DesktopBackendController(onFailure => this.createHost(onFailure), state => {
+      if (state.phase === 'error' && !this.closing) this.report(state.message)
+      this.options.onChange()
+    })
+  }
+
+  initialize(): void {
+    try { this.selected = this.profiles.active } catch (error) { this.report(error) }
+    try { this.preferences = this.settings.read() } catch (error) { this.report(error) }
+    this.diagnostics.level = this.preferences.logLevel
+  }
+
+  report(error: unknown): void {
+    if (this.closing) return
+    this.failure = maskSecrets(error instanceof Error ? error.message : String(error))
+    this.diagnostics.append(this.failure, 'error')
+    this.options.onFailure()
+    this.options.onChange()
+  }
+
+  start(): Promise<void> {
+    this.failure = ''
+    this.startup = this.backend.start(async () => {
+      if (this.safeMode && !this.safeHome) {
+        privateDirectory(this.recovery.directory)
+        this.safeHome = mkdtempSync(join(this.recovery.directory, 'safe-runtime-'))
+        const safe = new NextProfiles(this.safeHome)
+        safe.ensure('default')
+        safe.setFeatures('default', { remoteControl: false, market: false })
+      }
+      if (!this.safeMode) this.profiles.ensure(this.selected)
+    })
+    // The backend publishes failures after owned process cleanup.
+    void this.startup.catch(() => {})
+    return this.startup
+  }
+
+  async restart(change: () => void | Promise<void> = () => {}): Promise<void> {
+    await this.backend.stop()
+    if (this.closing) return
+    await change()
+    if (!this.safeMode && this.safeHome) { rmSync(this.safeHome, { recursive: true, force: true }); this.safeHome = undefined }
+    await this.start()
+  }
+
+  writePreferences(value: unknown): void {
+    this.preferences = this.settings.write(parsePreferences(value))
+    this.diagnostics.level = this.preferences.logLevel
+    this.options.onChange()
+  }
+
+  state(): Pick<DesktopState, 'selected' | 'profiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
+    let features = { ...DEFAULT_FEATURES }
+    let profiles: string[] = []
+    let checkpoint: DesktopState['checkpoint'] = null
+    let failure = this.failure
+    try { profiles = this.profiles.list() } catch (error) { failure ||= maskSecrets(String(error)) }
+    try { features = this.profiles.features(this.selected) } catch (error) { failure ||= maskSecrets(String(error)) }
+    try { const saved = this.recovery.latest(this.selected); if (saved) checkpoint = { created: saved.created } } catch { /* Recovery remains usable without backups. */ }
+    return { selected: this.selected, profiles, features, preferences: { ...this.preferences }, phase: !this.auth && failure ? 'error' : this.backend.state.phase,
+      busy: this.busy, failure, safeMode: this.safeMode, home: this.options.home,
+      browserUrl: this.auth && this.preferences.browserAccess && !this.safeMode ? new URL(this.auth.url).origin : null,
+      lan: this.lan?.snapshot() ?? null, checkpoint, logs: this.diagnostics.snapshot() }
+  }
+
+  browserLink(lan = false): string {
+    if (!this.auth || this.backend.state.phase !== 'ready' || !this.preferences.browserAccess || this.safeMode) throw new Error('Browser access is unavailable')
+    const url = new URL(this.auth.url)
+    if (lan) {
+      const edge = this.lan?.snapshot()
+      if (edge?.state !== 'ready' || !edge.addresses[0] || !edge.actualPort) throw new Error('LAN HTTPS is unavailable')
+      url.protocol = 'https:'; url.hostname = edge.addresses[0]; url.port = String(edge.actualPort)
+    }
+    return url.href
+  }
+
+  async close(): Promise<void> {
+    this.closing = true
+    await this.backend.close()
+    if (this.safeHome) { rmSync(this.safeHome, { recursive: true, force: true }); this.safeHome = undefined }
+    this.diagnostics.flush()
+  }
+
+  private createHost(onFailure: (error: Error) => void) {
+    const { options } = this
+    const actualHome = this.safeMode ? this.safeHome! : options.home
+    const profile = this.safeMode ? 'default' : this.selected
+    const effective = this.safeMode ? { ...this.preferences, browserAccess: false, networkExposure: 'loopback' as const, port: 0 } : this.preferences
+    const addresses = effective.browserAccess && effective.networkExposure === 'lan' ? options.addresses() : []
+    const token = randomBytes(32).toString('base64url')
+    const lan = new DesktopLanHttpsRuntime({ addresses, requestedPort: effective.lanPort,
+      prepareCertificate: async () => ({ certificate: await options.certificate(addresses) }) })
+    this.lan = lan
+    let stopped = false
+    const host = new DesktopHostProcess(options.executable, options.root, new NextProfiles(actualHome).directory(profile), undefined,
+      { ...process.env, DSH_HOME: actualHome, DSH_NEXT_NATIVE_TOKEN: token,
+        DSH_NEXT_PREFERENCES: JSON.stringify(effective), DSH_NEXT_TRUSTED_HOSTS: JSON.stringify(addresses),
+        ...(this.safeMode ? { DSH_TELEMETRY_DISABLED: '1' } : {}) },
+      onFailure, undefined, 'runtime', undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
+      chunk => this.diagnostics.hostChunk(chunk), options.onTerminal)
+    return {
+      start: async (): Promise<void> => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const ready = await Promise.race([host.start(), new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('Host startup exceeded 60 seconds')), 60_000)
+          timer.unref()
+        })]).finally(() => clearTimeout(timer))
+        const url = new URL(ready.url)
+        if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') throw new Error('Next Host must use loopback HTTP')
+        if (!ready.injections) throw new Error('Next Host omitted Web boot injections')
+        const cookie = await authenticateWebHost(ready.url, token)
+        if (stopped) return
+        this.auth = { url: ready.url, cookie, token, injections: ready.injections }
+        lan.attach(Number(url.port))
+        if (effective.browserAccess && effective.networkExposure === 'lan') {
+          const edge = await lan.setEnabled(true)
+          if (stopped) { await lan.stop(); return }
+          if (edge.state === 'failed') this.report(`LAN HTTPS: ${edge.errorCode}`)
+        }
+        if (!this.safeMode) {
+          try { this.recovery.checkpoint(this.selected) } catch (error) { this.diagnostics.append(`Recovery checkpoint: ${String(error)}`, 'warn') }
+        }
+        this.diagnostics.append(`Host ready: ${profile}${this.safeMode ? ' (safe mode)' : ''}`)
+      },
+      stop: async (): Promise<void> => {
+        stopped = true
+        this.auth = undefined
+        await lan.stop()
+        await host.stop()
+        if (this.lan === lan) this.lan = undefined
+      },
+    }
+  }
+}
