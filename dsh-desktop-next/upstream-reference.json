@@ -1,17 +1,32 @@
 {
   "repository": "https://github.com/deepseek-ai/deepseek-harness",
-  "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
-  "version": "0.1.5-rc.2",
+  "commit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+  "version": "0.1.6-alpha.2",
   "files": [
     {
       "upstream": "apps/desktop/src/host-process.ts",
       "local": "src/host-process.ts",
-      "upstreamSha256": "9bc9bce5de490b100db053066f248983d5faa2027a89b209c8f4a1704b263acf"
+      "upstreamSha256": "f46169be5638b815929fd267cf985af5da3d284dfc8874a797cdcd396d22389f"
     },
     {
-      "upstream": "apps/desktop/src/host-protocol.ts",
-      "local": "src/host-protocol.ts",
-      "upstreamSha256": "ef608222e30a4976d3d93e9f0e7fcc004161b346fa8b0cd005a370dc44824065"
+      "upstream": "apps/desktop/src/node-environment.ts",
+      "local": "src/node-environment.ts",
+      "upstreamSha256": "cd760fede0ea4838269b09f9d68fd95dde2956d3542f16ed2a6b9629b02339bf"
+    },
+    {
+      "upstream": "apps/desktop/src/web-document.ts",
+      "local": "src/web-document.ts",
+      "upstreamSha256": "550c91ba601f245ce4220a6f6c1abe16ce7a23005431368eaef3e3c6f9e56a24"
+    },
+    {
+      "upstream": "apps/desktop/src/backend-controller.ts",
+      "local": "src/backend-controller.ts",
+      "upstreamSha256": "3475cb9ca34a92318affa9553f91d11b55d78fe7b7781dc70e6855f28d65c456"
+    },
+    {
+      "upstream": "apps/desktop/src/startup-error.ts",
+      "local": "src/startup-error.ts",
+      "upstreamSha256": "ba75b42f56dd8352eecd7ad94841cb32142cebcdab864c8e4c04452788a47378"
     },
     {
       "upstream": "apps/desktop/src/single-instance.ts",
@@ -19,34 +34,24 @@
       "upstreamSha256": "dc6a6e263a6fdedc3f1cfacb97eb6f60dd5b04ad5d3b02daae4640f2e30a5150"
     },
     {
-      "upstream": "apps/desktop/src/preload-app.ts",
-      "local": "src/preload-app.ts",
-      "upstreamSha256": "5818fe7eac11685d93418222fb9349b97d258d59f776892041e924fdd36914ef"
-    },
-    {
-      "upstream": "apps/desktop-host/src/index.ts",
-      "local": "src/host/index.ts",
-      "upstreamSha256": "7e7583f07800f6c257809d1dfb328d3942e84e6df97a78dd8af877b5e3bc27f3"
-    },
-    {
-      "upstream": "apps/desktop-host/src/wire.ts",
-      "local": "src/host/wire.ts",
-      "upstreamSha256": "887589acaa7df830fd559e2b9abbc69b667ccfb68df2670731db83a59b33a4df"
-    },
-    {
-      "upstream": "apps/desktop-host/config/desktop.cordis.patch.yml",
-      "local": "desktop.cordis.patch.yml",
-      "upstreamSha256": "28b57c998d65fa7f028a2db097e0f19ac79c8f5525ccfa7cc6ad8b886442f852"
-    },
-    {
       "upstream": "apps/desktop/tests/host-process.spec.ts",
       "local": "tests/host-process.spec.ts",
-      "upstreamSha256": "c730794245255795e46f8da3c1484fa3a51fadfda751f90335750d0783dac7f2"
+      "upstreamSha256": "86ca6881707d8943c175ec95635003bcf6641e6fef17f8afb594b5765112a16a"
     },
     {
-      "upstream": "apps/desktop/tests/host-protocol.spec.ts",
-      "local": "tests/host-protocol.spec.ts",
-      "upstreamSha256": "ce36dcae0f14c86138258fa759b26921c6eef0d3f557b3f4835dfa64d06d43aa"
+      "upstream": "apps/desktop/tests/node-environment.spec.ts",
+      "local": "tests/node-environment.spec.ts",
+      "upstreamSha256": "431e9488b13dfe5b746f3ca62598645a755b2acc7559c5505e03afe2c67b3ae2"
+    },
+    {
+      "upstream": "apps/desktop/tests/web-document.spec.ts",
+      "local": "tests/web-document.spec.ts",
+      "upstreamSha256": "63efaa30d991a4c95373a5d0b8c957afcf118d41a456387a14c7c32826050a79"
+    },
+    {
+      "upstream": "apps/desktop/tests/backend-controller.spec.ts",
+      "local": "tests/backend-controller.spec.ts",
+      "upstreamSha256": "9ac4e18bc93977741cbbc4760af71de9dfe60d68d39ed57d29c2fad61c96a0fa"
     },
     {
       "upstream": "apps/desktop/tests/single-instance.spec.ts",

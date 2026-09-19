@@ -16,6 +16,7 @@ const upstream = readJson('upstream.json')
 const stablePlugin = readJson('dsh-plugin-desktop/package.json')
 const betaPlugin = readJson('dsh-plugin-desktop-beta/package.json')
 const nextDesktop = readJson('dsh-desktop-next/package.json')
+const nextReference = readJson('dsh-desktop-next/upstream-reference.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
 const upstreamPackage = readJson('deepseek-harness/package.json')
@@ -135,5 +136,5 @@ process.stdout.write(`verify-layout: Desktop workspaces including Next and upstr
 
 if (nextDesktop.name !== 'dsh-desktop-next' || nextDesktop.private !== true) fail('Next must remain a private experimental package')
 for (const [name, version] of Object.entries(nextDesktop.dependencies)) {
-  if ((name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) && version !== activeUpstream.runtimePackageVersion) fail(`Next ${name} must match the pinned upstream family`)
+  if ((name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) && version !== nextReference.version) fail(`Next ${name} must match the pinned upstream family`)
 }
