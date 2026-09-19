@@ -5,7 +5,7 @@ the package names, versions, and licenses for transparency.
 | Package | Version | License |
 | --- | --- | --- |
 | @agentclientprotocol/sdk | 1.4.0 | Apache-2.0 |
-| @agents-anywhere/dsh-bridge-next | 0.1.0-dev.0.desktop.ce53016f05be0.re9c8ad00 | MIT |
+| @agents-anywhere/dsh-bridge-next | 0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2 | MIT |
 | @anthropic-ai/sdk | 0.123.0 | MIT |
 | @aws-crypto/sha256-browser | 5.2.0 | Apache-2.0 |
 | @aws-crypto/sha256-js | 5.2.0 | Apache-2.0 |
@@ -35,8 +35,8 @@ the package names, versions, and licenses for transparency.
 | @babel/helper-validator-identifier | 7.29.7 | MIT |
 | @babel/runtime | 7.29.7 | MIT |
 | @dataiku/uv | 0.12.0 | MIT |
-| @dataiku/uv-win32-arm64 | 0.12.0 | MIT |
-| @dataiku/uv-win32-x64 | 0.12.0 | MIT |
+| @dataiku/uv-darwin-arm64 | 0.12.0 | MIT |
+| @dataiku/uv-darwin-x64 | 0.12.0 | MIT |
 | @deepseek-ai/cordis | 4.0.2 | MIT |
 | @deepseek-ai/cordis-plugin-group | 1.0.2 | MIT |
 | @deepseek-ai/cordis-plugin-include | 1.0.7 | MIT |
@@ -295,19 +295,23 @@ the package names, versions, and licenses for transparency.
 | @deepseek-ai/dsh-workspace | 0.1.6-alpha.2 | MIT |
 | @deepseek-ai/dsh-workspace-changes | 0.1.6-alpha.2 | MIT |
 | @deepseek-ai/libreoffice-kit | 0.0.1 | MPL-2.0 |
-| @deepseek-ai/libreoffice-kit-win32-arm64 | 0.0.1 | MPL-2.0 |
-| @deepseek-ai/libreoffice-kit-win32-x64 | 0.0.1 | MPL-2.0 |
+| @deepseek-ai/libreoffice-kit-darwin-arm64 | 0.0.1 | MPL-2.0 |
+| @deepseek-ai/libreoffice-kit-darwin-x64 | 0.0.1 | MPL-2.0 |
 | @deepseek-ai/node-addon-system | 0.1.2 | BSD-3-Clause |
+| @deepseek-ai/node-addon-system-darwin-arm64 | 0.1.2 | BSD-3-Clause |
+| @deepseek-ai/node-addon-system-darwin-x64 | 0.1.2 | BSD-3-Clause |
 | @deepseek-ai/schemastery | 3.18.2 | MIT |
 | @earendil-works/pi-ai | 0.85.1 | MIT |
 | @earendil-works/pi-telemetry | 0.85.1 | MIT |
 | @google/genai | 1.52.0 | Apache-2.0 |
 | @img/colour | 1.1.0 | MIT |
-| @img/sharp-win32-arm64 | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
-| @img/sharp-win32-x64 | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
+| @img/sharp-darwin-arm64 | 0.35.3 | Apache-2.0 |
+| @img/sharp-darwin-x64 | 0.35.3 | Apache-2.0 |
+| @img/sharp-libvips-darwin-arm64 | 1.3.2 | LGPL-3.0-or-later |
+| @img/sharp-libvips-darwin-x64 | 1.3.2 | LGPL-3.0-or-later |
 | @joplin/turndown-plugin-gfm | 1.0.67 | MIT |
-| @koromix/koffi-win32-arm64 | 3.1.5 | MIT |
-| @koromix/koffi-win32-x64 | 3.1.5 | MIT |
+| @koromix/koffi-darwin-arm64 | 3.1.5 | MIT |
+| @koromix/koffi-darwin-x64 | 3.1.5 | MIT |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
 | @modelcontextprotocol/client | 2.0.0 | MIT |
 | @modelcontextprotocol/core | 2.0.0 | MIT |
@@ -367,8 +371,8 @@ the package names, versions, and licenses for transparency.
 | @types/node | 26.2.0 | MIT |
 | @types/retry | 0.12.0 | MIT |
 | @vscode/ripgrep | 1.18.0 | MIT |
-| @vscode/ripgrep-win32-arm64 | 1.18.0 | MIT |
-| @vscode/ripgrep-win32-x64 | 1.18.0 | MIT |
+| @vscode/ripgrep-darwin-arm64 | 1.18.0 | MIT |
+| @vscode/ripgrep-darwin-x64 | 1.18.0 | MIT |
 | @xterm/addon-serialize | 0.14.0 | MIT |
 | @xterm/headless | 6.0.0 | MIT |
 | adm-zip | 0.6.0 | MIT |
@@ -466,8 +470,8 @@ the package names, versions, and licenses for transparency.
 | node-addon-api | 7.1.1 | MIT |
 | node-addon-native-custom-loader | 0.1.4 | MIT |
 | node-addon-require-builtin | 0.1.4 | MIT |
-| node-addon-require-builtin-win32-arm64-msvc | 0.1.4 | MIT |
-| node-addon-require-builtin-win32-x64-msvc | 0.1.4 | MIT |
+| node-addon-require-builtin-darwin-arm64 | 0.1.4 | MIT |
+| node-addon-require-builtin-darwin-x64 | 0.1.4 | MIT |
 | node-domexception | 1.0.0 | MIT |
 | node-fetch | 3.3.2 | MIT |
 | node-pty | 1.2.0-beta.15 | MIT |
@@ -546,4 +550,4 @@ the package names, versions, and licenses for transparency.
 | yargs-parser | 18.1.3 | ISC |
 | yoctocolors | 2.2.0 | MIT |
 | zod | 4.4.3 | MIT |
-> Notice-required licenses in use: Apache-2.0 AND LGPL-3.0-or-later. Their license texts ship inside node_modules; see the package LICENSE files for the full terms.
+> Notice-required licenses in use: LGPL-3.0-or-later. Their license texts ship inside node_modules; see the package LICENSE files for the full terms.

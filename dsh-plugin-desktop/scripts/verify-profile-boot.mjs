@@ -60,6 +60,14 @@ try {
   ].join('\n'))
   const aaRequested = process.env.DSH_VERIFY_AA === '1'
   const brokenAa = process.env.DSH_VERIFY_AA_BROKEN === '1'
+  // A shared AA directory may already contain settings written by a newer channel.
+  const aaSettings = {
+    uvPath: '', uvPypiIndexUrl: '', uvPythonInstallMirror: '', syncIntervalSeconds: 37,
+  }
+  if (aaRequested && !brokenAa) {
+    mkdirSync(join(home, 'aa-smoke-state'))
+    writeFileSync(join(home, 'aa-smoke-state', 'connector-settings.json'), JSON.stringify(aaSettings))
+  }
   if (brokenAa) {
     const initial = prepareDesktopProfile('1', home, 'win32')
     const brokenPackage = join(initial.profile.dir, 'node_modules', '@agents-anywhere', 'dsh-bridge-next')
@@ -337,6 +345,12 @@ try {
     if (!existsSync(endpoint)) throw new Error('AA did not publish its native DSH home endpoint')
     const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
     if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')
+    for (const [key, value] of Object.entries(aaSettings)) {
+      if (snapshot.connector.settings[key] !== value) {
+        throw new Error(`AA did not preserve the shared connector setting ${key}`)
+      }
+    }
+    if (!snapshot.connector.resolvedUvPath) throw new Error('AA did not resolve its uv runtime')
   }
   for (const id of [
     'dsh-plugin-desktop',

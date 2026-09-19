@@ -9,6 +9,14 @@ export type MacUniversalArch = 'arm64' | 'x86_64'
 export const MACOS_UNIVERSAL_NATIVE_ENTRIES = [
   {
     arch: 'arm64',
+    path: 'node_modules/@dataiku/uv-darwin-arm64/bin/uv',
+  },
+  {
+    arch: 'x86_64',
+    path: 'node_modules/@dataiku/uv-darwin-x64/bin/uv',
+  },
+  {
+    arch: 'arm64',
     path: 'node_modules/@deepseek-ai/node-addon-system-darwin-arm64/bin/system.node',
   },
   {

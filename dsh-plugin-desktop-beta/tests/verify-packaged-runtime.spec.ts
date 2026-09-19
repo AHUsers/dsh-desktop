@@ -38,6 +38,7 @@ import {
   smokePackagedElectronRuntime,
   summarizeUnpackedRuntime,
   verifyPackagedRuntime,
+  verifyPackagedAgentsAnywhere,
   verifySelectiveUnpackedRuntime,
   type ArchiveHeaderReader,
   type FileProbe,
@@ -276,9 +277,23 @@ describe('packaged desktop runtime verification', () => {
         expect(received).toBe(summary)
         calls.push('report')
       },
+      () => { calls.push('aa') },
     )
 
-    expect(calls).toEqual(['static', 'report'])
+    expect(calls).toEqual(['static', 'aa', 'report'])
+  })
+
+  it('rejects a stale AA version or entry copied into the installation payload', () => {
+    const installed = (path: string): Buffer => path.endsWith('package.json')
+      ? Buffer.from(JSON.stringify({ version: '0.1.0-dev.desktop.c123' }))
+      : Buffer.from('prepared AA entry')
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, installed)).not.toThrow()
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, path =>
+      path.endsWith('package.json') ? Buffer.from('{"version":"0.1.0-old"}') : installed(path),
+    )).toThrow('Packaged AA version mismatch')
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, path =>
+      path.endsWith('lib/index.js') ? Buffer.from('stale AA entry') : installed(path),
+    )).toThrow('Packaged AA entry differs')
   })
 
   it('tracks ripgrep and the ConPTY native surface required on Windows', () => {
