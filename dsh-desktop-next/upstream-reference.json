@@ -1,0 +1,57 @@
+{
+  "repository": "https://github.com/deepseek-ai/deepseek-harness",
+  "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
+  "version": "0.1.5-rc.2",
+  "files": [
+    {
+      "upstream": "apps/desktop/src/host-process.ts",
+      "local": "src/host-process.ts",
+      "upstreamSha256": "9bc9bce5de490b100db053066f248983d5faa2027a89b209c8f4a1704b263acf"
+    },
+    {
+      "upstream": "apps/desktop/src/host-protocol.ts",
+      "local": "src/host-protocol.ts",
+      "upstreamSha256": "ef608222e30a4976d3d93e9f0e7fcc004161b346fa8b0cd005a370dc44824065"
+    },
+    {
+      "upstream": "apps/desktop/src/single-instance.ts",
+      "local": "src/single-instance.ts",
+      "upstreamSha256": "dc6a6e263a6fdedc3f1cfacb97eb6f60dd5b04ad5d3b02daae4640f2e30a5150"
+    },
+    {
+      "upstream": "apps/desktop/src/preload-app.ts",
+      "local": "src/preload-app.ts",
+      "upstreamSha256": "5818fe7eac11685d93418222fb9349b97d258d59f776892041e924fdd36914ef"
+    },
+    {
+      "upstream": "apps/desktop-host/src/index.ts",
+      "local": "src/host/index.ts",
+      "upstreamSha256": "7e7583f07800f6c257809d1dfb328d3942e84e6df97a78dd8af877b5e3bc27f3"
+    },
+    {
+      "upstream": "apps/desktop-host/src/wire.ts",
+      "local": "src/host/wire.ts",
+      "upstreamSha256": "887589acaa7df830fd559e2b9abbc69b667ccfb68df2670731db83a59b33a4df"
+    },
+    {
+      "upstream": "apps/desktop-host/config/desktop.cordis.patch.yml",
+      "local": "desktop.cordis.patch.yml",
+      "upstreamSha256": "28b57c998d65fa7f028a2db097e0f19ac79c8f5525ccfa7cc6ad8b886442f852"
+    },
+    {
+      "upstream": "apps/desktop/tests/host-process.spec.ts",
+      "local": "tests/host-process.spec.ts",
+      "upstreamSha256": "c730794245255795e46f8da3c1484fa3a51fadfda751f90335750d0783dac7f2"
+    },
+    {
+      "upstream": "apps/desktop/tests/host-protocol.spec.ts",
+      "local": "tests/host-protocol.spec.ts",
+      "upstreamSha256": "ce36dcae0f14c86138258fa759b26921c6eef0d3f557b3f4835dfa64d06d43aa"
+    },
+    {
+      "upstream": "apps/desktop/tests/single-instance.spec.ts",
+      "local": "tests/single-instance.spec.ts",
+      "upstreamSha256": "763eb83b7e2c5082ab1ee31c2a21916f636a3921de0d7fad6485de9a849bd97b"
+    }
+  ]
+}
