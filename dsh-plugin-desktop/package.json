@@ -131,7 +131,7 @@
     "dist:win": "node scripts/package-win.ts",
     "dist:win-portable": "node scripts/package-win-portable.ts",
     "prepack": "yarn run check",
-    "verify:aa": "DSH_VERIFY_AA=1 node scripts/verify-profile-boot.mjs",
+    "verify:aa": "node ../scripts/prepare-agents-anywhere-runtime.mjs && DSH_VERIFY_AA=1 node scripts/verify-profile-boot.mjs",
     "prepare:electron-native": "node scripts/prepare-fs-ext.ts"
   },
   "dependencies": {

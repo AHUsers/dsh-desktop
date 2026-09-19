@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AA_REPOSITORY, assertPreparedAaRelease, runtimePeerRanges as readRuntimePeerRanges } from './agents-anywhere-release-policy.mjs'
+import { prepareInstalledAaRuntime } from './prepare-agents-anywhere-runtime.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sourceRepository = process.env.DSH_AA_SOURCE_REPOSITORY ?? AA_REPOSITORY
@@ -124,11 +125,13 @@ function prepare() {
     && existsSync(join(vendorRoot, currentProvenance.artifact))
     && sha256(join(vendorRoot, currentProvenance.artifact)) === currentProvenance.sha256) {
     assertPreparedAaRelease(root, commit, { installed: false })
+    prepareInstalledAaRuntime(root)
     try {
       assertPreparedAaRelease(root, commit)
     } catch {
       console.log('Refreshing installed AA dependencies from the verified artifact')
       run('corepack', ['yarn', 'install', '--mode=skip-build'], root)
+      prepareInstalledAaRuntime(root)
       assertPreparedAaRelease(root, commit)
     }
     console.log(`Reusing verified AA artifact ${currentProvenance.artifact}`)
@@ -194,6 +197,7 @@ function prepare() {
       writeFileSync(join(root, path), `${JSON.stringify(manifest, null, 2)}\n`)
     }
     run('corepack', ['yarn', 'install', '--mode=skip-build'], root)
+    prepareInstalledAaRuntime(root)
     assertPreparedAaRelease(root, commit)
     published = true
     console.log(`Agents Anywhere release package prepared from ${commit} (${destination})`)
