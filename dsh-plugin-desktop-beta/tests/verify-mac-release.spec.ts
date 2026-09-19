@@ -54,7 +54,7 @@ describe('macOS release artifact verification', () => {
           '-verify_arch', entry.arch,
         ],
       }, ...(entry.path.endsWith('/bin/uv') ? [
-        { command: '/usr/bin/test', args: ['-x', join(appPath, 'Contents', 'Resources', 'app', entry.path)] },
+        { command: '/bin/test', args: ['-x', join(appPath, 'Contents', 'Resources', 'app', entry.path)] },
         ...(entry.arch === (process.arch === 'x64' ? 'x86_64' : process.arch)
           ? [{ command: join(appPath, 'Contents', 'Resources', 'app', entry.path), args: ['--version'] }]
           : []),
