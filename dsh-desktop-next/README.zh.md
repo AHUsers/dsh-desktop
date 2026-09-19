@@ -25,7 +25,7 @@ corepack yarn workspace dsh-desktop-next verify:host:electron
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
-macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中加载官方前端，验证首页和插件页收起后重新展开侧栏、拖动区域的位置，以及页面按钮可正常点击。构建后，首次安装测试浏览器并运行：
+macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中运行官方前端的 Desktop 启动分支。测试使用与 Next 相同的入口文档，通过模拟的 preload 接口提供真实 Host 注入，并断言已进入 Desktop 传输模式；随后验证首页和插件页收起后重新展开侧栏、拖动区域的位置，以及页面按钮可正常点击。构建后，首次安装测试浏览器并运行：
 
 ```sh
 corepack yarn workspace dsh-desktop-next exec playwright install chromium
