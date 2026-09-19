@@ -104,7 +104,7 @@ export interface MacUniversalPreparationOptions {
 }
 
 /**
- * Validate both CPU runtime trees and restore node-pty helper execute bits.
+ * Validate both CPU runtime trees and restore node-pty and uv execute bits.
  * Yarn intentionally disables lifecycle scripts, so the package step owns this
  * deterministic permission repair for both architectures.
  * @param options - Desktop root and injectable filesystem operations.
@@ -123,7 +123,7 @@ export function prepareMacUniversalRuntime(
   }
 
   for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
-    if (entry.path.endsWith('/spawn-helper')) {
+    if (entry.path.endsWith('/spawn-helper') || entry.path.endsWith('/bin/uv')) {
       options.chmod(join(root, entry.path), 0o755)
     }
   }

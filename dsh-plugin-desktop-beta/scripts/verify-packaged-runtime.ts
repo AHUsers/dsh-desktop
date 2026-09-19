@@ -3,6 +3,8 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
+  accessSync,
+  constants,
   existsSync,
   lstatSync,
   mkdtempSync,
@@ -859,6 +861,12 @@ export function verifyPackagedAgentsAnywhere(
     ? extractFile(resolvePackagedAsarPath(context), path)
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
+  if (context.electronPlatformName === 'darwin') {
+    const root = usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
+    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))) {
+      accessSync(join(root, entry.path), constants.X_OK)
+    }
+  }
   const packagePath = 'node_modules/@agents-anywhere/dsh-bridge-next'
   const desktopRoot = context.packager.projectDir ?? DESKTOP_PACKAGE_ROOT
   const expected = JSON.parse(readInstalled(join(desktopRoot, packagePath, 'package.json')).toString()) as { version: string }

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { AA_PACKAGE, AA_PEERS, AA_REPOSITORY, AA_WORKSPACES, assertPreparedAaRelease } from './agents-anywhere-release-policy.mjs'
+import { prepareInstalledAaRuntime } from './prepare-agents-anywhere-runtime.mjs'
 
 const commit = 'a'.repeat(40)
 const version = '0.1.0-dev.0.desktop.caaaaaaaaaaaa.r12345678'
@@ -72,4 +73,21 @@ test('rejects corrupted or replaced vendor bytes', t => {
   const { root } = fixture(t)
   writeFileSync(join(root, 'vendor/agents-anywhere', artifact), 'replaced bytes')
   assert.throws(() => assertPreparedAaRelease(root, commit), /checksum mismatch/)
+})
+
+test('repairs the 0644 uv payload for both Mac architectures in both channels', { skip: process.platform === 'win32' }, t => {
+  const { root } = fixture(t)
+  const files = AA_WORKSPACES.flatMap(workspace => ['arm64', 'x64'].map(arch =>
+    join(root, workspace, 'node_modules', '@dataiku', `uv-darwin-${arch}`, 'bin', 'uv')))
+  for (const path of files) {
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, 'uv fixture')
+    chmodSync(path, 0o644)
+  }
+  prepareInstalledAaRuntime(root, 'darwin')
+  for (const path of files) {
+    assert.equal(statSync(path).mode & 0o777, 0o755)
+    assert.doesNotThrow(() => accessSync(path, constants.X_OK))
+    assert.equal(readFileSync(path, 'utf8'), 'uv fixture')
+  }
 })

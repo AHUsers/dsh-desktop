@@ -82,6 +82,12 @@ export function verifyMacRelease(
     const unpackedRoot = join(appPath, 'Contents', 'Resources', 'app')
     for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])
+      if (entry.path.endsWith('/bin/uv')) {
+        options.run('/usr/bin/test', ['-x', join(unpackedRoot, entry.path)])
+        if (entry.arch === (process.arch === 'x64' ? 'x86_64' : process.arch)) {
+          options.run(join(unpackedRoot, entry.path), ['--version'])
+        }
+      }
     }
     options.run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
     options.run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])

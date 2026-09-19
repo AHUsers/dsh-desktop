@@ -1,5 +1,6 @@
 /** Headless smoke for the complete published DSH Web profile and renderer manifest. */
 
+import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -102,7 +103,7 @@ try {
     ...prepared.patches,
     // Keep this headless probe independent of the operator's AA account.
     ...(prepared.aaEnabled ? [{ id: 'agents-anywhere-bridge-next', config: {
-      dshHome: home, stateRoot: join(home, 'aa-smoke-state'),
+      dshHome: home, stateRoot: join(home, 'aa-smoke-state'), uvPath: 'uv',
     } }] : []),
   ]
   const packageRoot = new URL('../', import.meta.url)
@@ -350,7 +351,12 @@ try {
         throw new Error(`AA did not preserve the shared connector setting ${key}`)
       }
     }
-    if (!snapshot.connector.resolvedUvPath) throw new Error('AA did not resolve its uv runtime')
+    const uvSuffix = join('node_modules', '@dataiku', `uv-${process.platform}-${process.arch}`, 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv')
+    if (!snapshot.connector.resolvedUvPath?.endsWith(uvSuffix)) {
+      throw new Error('AA must resolve bundled uv instead of falling back to the operator PATH')
+    }
+    const uvVersion = execFileSync(snapshot.connector.resolvedUvPath, ['--version'], { encoding: 'utf8', timeout: 10_000 })
+    if (!/^uv \d+\./u.test(uvVersion)) throw new Error('Bundled AA uv did not return a version')
   }
   for (const id of [
     'dsh-plugin-desktop',

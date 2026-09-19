@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -281,6 +282,30 @@ describe('packaged desktop runtime verification', () => {
     )
 
     expect(calls).toEqual(['static', 'aa', 'report'])
+  })
+
+  it.skipIf(process.platform === 'win32')('rejects a 0644 packaged uv before signing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-uv-'))
+    try {
+      const base = context(root, 'darwin', 4)
+      const target: PackagedRuntimeContext = {
+        ...base, packager: { ...base.packager, platformSpecificBuildOptions: { asar: false } },
+      }
+      const files = ['arm64', 'x64'].map(arch => join(
+        resolvePackagedApplicationRoot(target), 'node_modules', '@dataiku', `uv-darwin-${arch}`, 'bin', 'uv',
+      ))
+      for (const path of files) {
+        mkdirSync(join(path, '..'), { recursive: true })
+        writeFileSync(path, 'uv fixture')
+        chmodSync(path, 0o644)
+      }
+      const read = (path: string): Buffer => Buffer.from(path.endsWith('package.json') ? '{"version":"1.0.0"}' : 'same AA')
+      expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
+      for (const path of files) chmodSync(path, 0o755)
+      expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('rejects a stale AA version or entry copied into the installation payload', () => {
