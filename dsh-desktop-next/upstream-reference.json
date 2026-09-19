@@ -57,6 +57,31 @@
       "upstream": "apps/desktop/tests/single-instance.spec.ts",
       "local": "tests/single-instance.spec.ts",
       "upstreamSha256": "763eb83b7e2c5082ab1ee31c2a21916f636a3921de0d7fad6485de9a849bd97b"
+    },
+    {
+      "upstream": "apps/desktop/src/preload-platform.ts",
+      "local": "src/preload-platform.ts",
+      "upstreamSha256": "4d97d27ee98d472c27be0efd5b90b52eebd61930e05d31d9f81634a36539204c"
+    },
+    {
+      "upstream": "apps/desktop/src/preload-theme.ts",
+      "local": "src/preload-theme.ts",
+      "upstreamSha256": "41ab2e0293265e08a06761fe28ce271577ca818148f9ec55e6113a66ef6b41b8"
+    },
+    {
+      "upstream": "apps/desktop/src/preload-windows.ts",
+      "local": "src/preload-windows.ts",
+      "upstreamSha256": "776cf6acd3ab4286844913a9f94bf7d3979186d846cda9f53e25a072d2f7e218"
+    },
+    {
+      "upstream": "apps/desktop/src/preload-menu.ts",
+      "local": "src/preload-menu.ts",
+      "upstreamSha256": "e9a7383739abbfa6446a6415af9e00c7aabc927a9f479264c98319b7671ea162"
+    },
+    {
+      "upstream": "apps/desktop/src/windows-layout.ts",
+      "local": "src/windows-layout.ts",
+      "upstreamSha256": "c032247c34d9794171aa3bd67534d511aca9f8963058d9976fb57f8c06a24628"
     }
   ]
 }

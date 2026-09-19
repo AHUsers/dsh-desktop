@@ -3,13 +3,15 @@ import { mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, session, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { authenticateWebHost, forwardWebRequest, serveWebDocument } from './web-document.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { DEFAULT_FEATURES, NEXT_PACKAGE, NextProfiles, parseFeatures, profileName } from './profiles.ts'
 import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
+import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
+import { resolveDesktopLocale } from './menu-locale.ts'
 
 const root = dirname(NEXT_PACKAGE)
 const home = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
@@ -32,22 +34,39 @@ let injections: readonly unknown[] = []
 const profiles = new NextProfiles(home)
 let selected = 'default'
 let failure = ''
+let windowsLanguage = 'zh-CN'
 const require = createRequire(NEXT_PACKAGE)
 const webRoot = dirname(require.resolve('@deepseek-ai/dsh-web-frontend/dist/index.html'))
 
-function assertSender(event: IpcMainInvokeEvent, owner: BrowserWindow | undefined, origin: string): void {
+function assertSender(event: Pick<IpcMainInvokeEvent, 'sender' | 'senderFrame'>, owner: BrowserWindow | undefined, origin: string): void {
   if (!owner || owner.isDestroyed() || event.sender !== owner.webContents
     || event.senderFrame !== owner.webContents.mainFrame || !event.senderFrame.url.startsWith(origin)) {
     throw new Error('Rejected Next IPC sender')
   }
 }
 
-function createWindow(preload: string): BrowserWindow {
+function createWindow(preload: string, primary = false): BrowserWindow {
   const window = new BrowserWindow({ width: 1280, height: 840, minWidth: 800, minHeight: 580,
-    show: false, title: 'DSH Desktop Next', webPreferences: {
+    show: false, title: 'DSH Desktop Next',
+    ...(process.platform === 'win32' && primary ? {
+      titleBarStyle: 'hidden' as const,
+      titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: nativeTheme.shouldUseDarkColors ? '#1b1b1c' : '#f9fafb',
+        symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
+    } : {}),
+    ...(process.platform === 'darwin' && primary ? {
+      titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 18 },
+      vibrancy: 'sidebar' as const, visualEffectState: 'active' as const, backgroundColor: '#00000000',
+    } : {}),
+    webPreferences: {
       preload: join(root, 'lib', preload), contextIsolation: true, sandbox: true, nodeIntegration: false,
     } })
   window.once('ready-to-show', () => window.show())
+  if (primary) window.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === ',' && (input.control || input.meta) && !input.alt) {
+      event.preventDefault()
+      openControls()
+    }
+  })
   const openExternal = (url: string): void => {
     if (['https:', 'http:', 'mailto:'].includes(new URL(url).protocol)) void shell.openExternal(url)
   }
@@ -198,17 +217,53 @@ async function main(): Promise<void> {
     if (headers.origin !== 'dsh-app://app') return callback({ cancel: true })
     callback({ requestHeaders: { ...headers, origin: host.origin, cookie: hostCookie, 'sec-fetch-site': 'same-origin' } })
   })
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'DSH Desktop Next', submenu: [
-      { label: 'Profile 与附加功能…', accelerator: 'CmdOrCtrl+,', click: openControls },
-      { label: '重启 Host', click: () => { void command({ type: 'restart' }).catch(reportFailure) } },
-      { label: '恢复当前 Profile…', click: () => { void command({ type: 'recover' }).catch(reportFailure) } },
-      { type: 'separator' }, { role: 'quit' },
-    ] }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
+  ipcMain.on(IPC.nativeThemeSet, (event, source: unknown) => {
+    try { assertSender(event, mainWindow, APP_URL) } catch { return }
+    if (source === 'light' || source === 'dark' || source === 'system') nativeTheme.themeSource = source
+  })
+  const applicationItems = (): MenuItemConstructorOptions[] => [
+    { label: 'Profile 与附加功能…', accelerator: 'CmdOrCtrl+,', click: openControls },
+    { label: '重启 Host', click: () => { void command({ type: 'restart' }).catch(reportFailure) } },
+    { label: '恢复当前 Profile…', click: () => { void command({ type: 'recover' }).catch(reportFailure) } },
+    { type: 'separator' }, { role: 'quit' },
+  ]
+  Menu.setApplicationMenu(process.platform === 'win32' ? null : Menu.buildFromTemplate([
+    { label: 'DSH Desktop Next', submenu: applicationItems() },
+    { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
   ]))
+  if (process.platform === 'win32') {
+    ipcMain.handle(IPC.windowsMenu, (event, name: unknown, x: unknown, y: unknown) => {
+      assertSender(event, mainWindow, APP_URL)
+      if ((name !== 'application' && name !== 'edit') || typeof x !== 'number' || typeof y !== 'number'
+        || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > 100_000 || y > 100_000) throw new Error('Invalid native menu request')
+      const window = mainWindow!
+      const messages = resolveDesktopLocale(windowsLanguage).messages
+      const editItem = (label: string, keyCode: string, modifiers: Array<'control'>, accelerator?: string): MenuItemConstructorOptions => ({
+        label, accelerator, click: () => {
+          window.webContents.focus()
+          window.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+          window.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+        },
+      })
+      const items: MenuItemConstructorOptions[] = name === 'application' ? applicationItems() : [
+        editItem(messages.undo, 'Z', ['control'], 'Ctrl+Z'), editItem(messages.redo, 'Y', ['control'], 'Ctrl+Y'),
+        { type: 'separator' }, editItem(messages.cut, 'X', ['control'], 'Ctrl+X'), editItem(messages.copy, 'C', ['control'], 'Ctrl+C'),
+        editItem(messages.paste, 'V', ['control'], 'Ctrl+V'), editItem(messages.delete, 'Delete', []),
+        { type: 'separator' }, editItem(messages.selectAll, 'A', ['control'], 'Ctrl+A'),
+      ]
+      const zoom = window.webContents.getZoomFactor()
+      return new Promise<void>(resolvePopup => { Menu.buildFromTemplate(items).popup({ window, x: Math.round(x * zoom), y: Math.round(y * zoom), callback: resolvePopup }) })
+    })
+    ipcMain.on(IPC.windowsAppearance, (event, language: unknown, color: unknown, symbolColor: unknown) => {
+      try { assertSender(event, mainWindow, APP_URL) } catch { return }
+      if (typeof language === 'string' && /^[a-zA-Z]+(?:-[a-zA-Z0-9]+)*$/u.test(language)) windowsLanguage = language
+      const validColor = (value: unknown): value is string => typeof value === 'string' && /^(?:#[\da-f]{3,8}|rgba?\([\d.,%\s]+\))$/iu.test(value)
+      if (validColor(color) && validColor(symbolColor)) mainWindow!.setTitleBarOverlay({ color, symbolColor })
+    })
+  }
   const openMain = (): void => {
     if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); return }
-    mainWindow = createWindow('preload-app.cjs')
+    mainWindow = createWindow('preload-app.cjs', true)
     mainWindow.on('closed', () => { mainWindow = undefined })
     mainWindow.webContents.on('render-process-gone', (_event, details) => { if (!quitting) reportFailure(new Error(`Renderer: ${details.reason}`)) })
     mainWindow.webContents.on('preload-error', (_event, _path, error) => reportFailure(error))

@@ -132,9 +132,9 @@ for (const [channel, plugin] of [['stable', stablePlugin], ['beta', betaPlugin]]
   }
 }
 
-process.stdout.write(`verify-layout: Desktop workspaces including Next and upstream ${activeUpstream.commit.slice(0, 10)} are consistent\n`)
-
 if (nextDesktop.name !== 'dsh-desktop-next' || nextDesktop.private !== true) fail('Next must remain a private experimental package')
 for (const [name, version] of Object.entries(nextDesktop.dependencies)) {
   if ((name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) && version !== nextReference.version) fail(`Next ${name} must match the pinned upstream family`)
 }
+
+process.stdout.write(`verify-layout: Desktop workspaces including Next and upstream ${activeUpstream.commit.slice(0, 10)} are consistent\n`)

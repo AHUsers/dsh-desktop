@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:host": "node scripts/verify-host.mjs",
-    "check": "yarn build && yarn typecheck && yarn test && yarn verify:host",
+    "verify:host:electron": "node scripts/verify-host.mjs --electron",
+    "verify:frontend": "node scripts/verify-frontend.mjs",
+    "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host",
     "dev": "yarn build && node scripts/start.mjs",
     "start": "node scripts/start.mjs"
   },
