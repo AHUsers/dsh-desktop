@@ -25,6 +25,15 @@ corepack yarn workspace dsh-desktop-next verify:host:electron
 
 This check opens no Electron window. Window presentation, native dialogs, and a real phone connection still require manual acceptance.
 
+The macOS sidebar and titlebar regression runs the official frontend's Desktop boot branch in headless Chromium with a temporary home. It serves the same entry document as Next, supplies real Host injections through a simulated preload contract, and asserts that Desktop transport is active. It checks reopening the sidebar from the homepage and plugin manager, drag-region geometry, and clickable page actions. After building, install the test browser once and run:
+
+```sh
+corepack yarn workspace dsh-desktop-next exec playwright install chromium
+corepack yarn workspace dsh-desktop-next verify:window-controls
+```
+
+Set `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` to use an installed Google Chrome instead. Screenshots are saved under `dsh-desktop-next/.desktop-next/verification/`. Native macOS window movement still needs manual verification. These additive controls use official layout actions and do not modify the upstream frontend.
+
 ## Usage
 
 The application menu's “Profile 与附加功能…” entry, also available through `CmdOrCtrl+,`, creates and switches Profiles and controls Market and remote access. Switching or applying feature settings stops the current Host before starting its replacement, interrupting active tasks.

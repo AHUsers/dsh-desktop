@@ -16,6 +16,7 @@
     "verify:host": "node scripts/verify-host.mjs",
     "verify:host:electron": "node scripts/verify-host.mjs --electron",
     "verify:frontend": "node scripts/verify-frontend.mjs",
+    "verify:window-controls": "node scripts/verify-window-controls.mjs",
     "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host",
     "dev": "yarn build && node scripts/start.mjs",
     "start": "node scripts/start.mjs"
@@ -178,17 +179,29 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
+    "@types/react": "^18",
     "electron": "44.0.0",
+    "playwright": "1.63.0",
     "tsdown": "0.22.2",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
   },
   "exports": {
+    ".": "./lib/extensions.js",
+    "./client": "./lib/client.js",
     "./extensions": "./lib/extensions.js",
     "./package.json": "./package.json",
     "./webserver": "./lib/webserver.js"
   },
   "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     }

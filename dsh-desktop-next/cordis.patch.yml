@@ -1,6 +1,6 @@
 - insert:
     - id: desktop-next-capabilities
-      name: dsh-desktop-next/extensions
+      name: dsh-desktop-next
     - id: community-market
       name: dsh-community-market
       disabled: true

@@ -25,6 +25,15 @@ corepack yarn workspace dsh-desktop-next verify:host:electron
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
+macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中运行官方前端的 Desktop 启动分支。测试使用与 Next 相同的入口文档，通过模拟的 preload 接口提供真实 Host 注入，并断言已进入 Desktop 传输模式；随后验证首页和插件页收起后重新展开侧栏、拖动区域的位置，以及页面按钮可正常点击。构建后，首次安装测试浏览器并运行：
+
+```sh
+corepack yarn workspace dsh-desktop-next exec playwright install chromium
+corepack yarn workspace dsh-desktop-next verify:window-controls
+```
+
+设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。补充的控件调用官方布局操作，不修改上游前端。
+
 ## 使用
 
 应用菜单中的“Profile 与附加功能…”可新建和切换 Profile，启停市场或手机远控；也可按 `CmdOrCtrl+,` 打开。切换或应用功能开关会先停止当前 Host，再启动新的 Host，进行中的任务会被中断。

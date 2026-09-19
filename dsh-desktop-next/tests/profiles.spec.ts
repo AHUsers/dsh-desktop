@@ -63,6 +63,8 @@ it('composes optional AA and Market while retaining the official Web layout', ()
   expect(rows.some(row => row.name === AA_PACKAGE && !row.disabled)).toBe(true)
   expect(rows.some(row => row.name === 'dsh-community-market' && !row.disabled)).toBe(true)
   expect(rows.some(row => row.id === 'ui-layout' && !row.disabled)).toBe(true)
+  // Client module discovery requires a package root, not the previous /extensions subpath.
+  expect(rows.find(row => row.id === 'desktop-next-capabilities')?.name).toBe('dsh-desktop-next')
   const reread = readProfilePatches('next', {
     name: 'default', dir, patchPath: profile.patchPath, installAnchor: NEXT_PACKAGE,
     cwd: dir, home: manager.home, startedBundles: WEB_BUNDLES, telemetryDisabledEnv: '1',
