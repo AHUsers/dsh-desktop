@@ -474,7 +474,7 @@ export interface MarketInstallServiceProvider {
 }
 
 export interface MarketDesktopActions {
-  openTerminal(): void
+  openTerminal?(): void
   requestRestart(): Promise<void>
 }
 
@@ -736,7 +736,7 @@ export function registerMarketRoutes(
           sources: await service.listSources(),
           builtIns: viewBuiltIns(),
           desktopActions: {
-            openTerminal: desktopActions !== undefined,
+            openTerminal: typeof desktopActions?.openTerminal === 'function',
             requestRestart: desktopActions !== undefined
               && installProvider?.get() !== undefined,
           },
@@ -952,7 +952,7 @@ export function registerMarketRoutes(
           return
         }
         const actions = desktopActionsProvider.get()
-        if (actions === undefined) {
+        if (actions?.openTerminal === undefined) {
           sendJson(res, 503, { error: 'desktop actions are unavailable' })
           return
         }

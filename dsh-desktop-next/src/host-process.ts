@@ -15,7 +15,7 @@ interface FatalEvent {
   readonly message: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | { readonly type: 'shutdown-complete' } | {
+type DesktopHostEvent = ReadyEvent | FatalEvent | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -34,6 +34,8 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
       return typeof candidate.url === 'string'
     case 'fatal':
       return typeof candidate.message === 'string'
+    case 'desktop-action':
+      return candidate.action === 'restart'
     case 'update-tasks':
       return Number.isSafeInteger(candidate.requestId) && typeof candidate.active === 'boolean'
         && (candidate.error === undefined || typeof candidate.error === 'string')
@@ -103,6 +105,8 @@ export class DesktopHostProcess {
     private readonly primaryRuntime?: string,
     private readonly profileResolution: 'link' | 'runtime' = 'link',
     private readonly packageManager?: { readonly pnpm: string; readonly nodeBin: string },
+    private readonly hostEntry?: string,
+    private readonly onRestart?: () => void,
   ) {}
 
   /**
@@ -111,7 +115,7 @@ export class DesktopHostProcess {
    */
   async start(): Promise<DesktopHostReady> {
     if (this.child !== undefined) return this.readyPromise
-    const entry = join(this.runtimeDir, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'lib', 'index.js')
+    const entry = this.hostEntry ?? join(this.runtimeDir, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'lib', 'index.js')
     const child = spawn(this.node, [
       '--expose-internals',
       ...(this.inspectPort === undefined ? [] : [`--inspect=127.0.0.1:${String(this.inspectPort)}`]),
@@ -142,6 +146,9 @@ export class DesktopHostProcess {
         else this.fail(new Error('dsh desktop host acknowledged an unrequested shutdown'))
       }
       else if (message.type === 'fatal') this.fail(new Error(message.message))
+      else if (message.type === 'desktop-action') {
+        if (!this.stopping && !this.failureReported) this.onRestart?.()
+      }
       else {
         const query = this.taskQueries.get(message.requestId)
         if (message.error === undefined) query?.resolve(message.active)

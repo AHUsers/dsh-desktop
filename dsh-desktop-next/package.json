@@ -19,7 +19,7 @@
     "start": "node scripts/start.mjs"
   },
   "dependencies": {
-    "@agents-anywhere/dsh-bridge-next": "file:../vendor/agents-anywhere/agents-anywhere-dsh-bridge-next-0.1.0-dev.0.desktop.c00df092c98b2.rcda81994.tgz",
+    "@agents-anywhere/dsh-bridge-next": "file:../vendor/agents-anywhere/agents-anywhere-dsh-bridge-next-0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2.tgz",
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/cordis-plugin-group": "1.0.2",
     "@deepseek-ai/cordis-plugin-include": "1.0.7",
@@ -31,6 +31,7 @@
     "@deepseek-ai/dsh-agent-instructions": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-agent-loop": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-agent-presets": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-agent-tool-presentation": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-anonymous-user-id": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-api-gateway": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-api-remotes": "0.1.6-alpha.2",
@@ -69,14 +70,15 @@
     "@deepseek-ai/dsh-client-ui-trajectory": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-client-ui-workspace": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-cmdline": "0.1.6-alpha.2",
-    "@deepseek-ai/dsh-code-runtime": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-command-feedback": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-commands": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-compaction": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-compaction-image-offload": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-cordis-client-runner": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-cordis-host-runner": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-credentials": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-deepseek-llm-api-extensions": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-file-reference": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-fs": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-fs-local": "0.1.6-alpha.2",
@@ -102,7 +104,9 @@
     "@deepseek-ai/dsh-native-command": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-output-retention": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-permission-presets": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-persona": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-plan-mode": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-ptc-runtime": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-pwsh-local": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-pwsh-sandbox": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-sandbox": "0.1.6-alpha.2",
@@ -139,7 +143,10 @@
     "@deepseek-ai/dsh-terminal-bash": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-timeout": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-token-meter": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-tool-ask-user": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-tool-bash": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-tool-bash-persistent": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-tool-cordis": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-tool-goal": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-tool-jobs": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-tool-pwsh-persistent": "0.1.6-alpha.2",
@@ -169,9 +176,19 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
-    "electron": "43.3.0",
+    "electron": "44.0.0",
     "tsdown": "0.22.2",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
+  },
+  "exports": {
+    "./extensions": "./lib/extensions.js",
+    "./package.json": "./package.json",
+    "./webserver": "./lib/webserver.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

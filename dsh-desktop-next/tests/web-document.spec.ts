@@ -61,3 +61,16 @@ it('refuses another page origin without forwarding its request', async () => {
   expect(response.status).toBe(403)
   expect(fetch).not.toHaveBeenCalled()
 })
+
+it('preserves Market mutation authority only for the owned application origin', async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response('{}'))
+  vi.stubGlobal('fetch', fetch)
+  const url = 'dsh-app://app/api/community-market/operations/preview'
+  expect((await forwardWebRequest(new Request(url, { method: 'POST', body: '{}' }), 'http://127.0.0.1:1234/', 'session=owned')).status).toBe(403)
+  expect(fetch).not.toHaveBeenCalled()
+  await forwardWebRequest(new Request(url, { method: 'POST', headers: { origin: 'dsh-app://app' }, body: '{}' }), 'http://127.0.0.1:1234/', 'session=owned')
+  const headers = new Headers(fetch.mock.calls[0]![1].headers)
+  expect(headers.get('origin')).toBe('http://127.0.0.1:1234')
+  expect(headers.get('sec-fetch-site')).toBe('same-origin')
+  expect(headers.get('cookie')).toBe('session=owned')
+})

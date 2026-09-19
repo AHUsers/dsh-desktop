@@ -60,12 +60,20 @@ export async function forwardWebRequest(request: Request, host: string, cookie: 
   const source = new URL(request.url)
   const origin = request.headers.get('origin')
   if (origin !== null && origin !== 'dsh-app://app') return new Response(null, { status: 403 })
+  const market = source.pathname.startsWith('/api/community-market/')
+  if (market && !['GET', 'HEAD'].includes(request.method) && origin !== 'dsh-app://app') return new Response(null, { status: 403 })
   const target = new URL(host)
   target.pathname = source.pathname
   target.search = source.search
   const headers = new Headers(request.headers)
   for (const name of ['host', 'origin', 'cookie', 'sec-fetch-site']) headers.delete(name)
   headers.set('cookie', cookie)
+  // Market retains its own same-origin mutation gate. Only translate after
+  // validating the application origin; never trust a caller-supplied Host.
+  if (market) {
+    headers.set('origin', target.origin)
+    headers.set('sec-fetch-site', 'same-origin')
+  }
   const init = { method: request.method, headers, body: request.body, signal: request.signal, duplex: 'half', redirect: 'manual' as const }
   const response = await fetch(target, init)
   const outgoing = new Headers(response.headers)
