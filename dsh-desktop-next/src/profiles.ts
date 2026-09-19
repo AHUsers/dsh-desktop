@@ -1,10 +1,11 @@
 /** Next-owned profile state. Recovery works without importing any user plugin. */
-import { randomUUID } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initProfile, loadProfileDirectory, PROFILE_TEMPLATES, sanitizeProfile, type Profile } from '@deepseek-ai/dsh-app-boot'
+import { initProfile, loadProfileDirectory, PROFILE_TEMPLATES, type Profile } from '@deepseek-ai/dsh-app-boot'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import { atomicJson, atomicText, readPrivateFile } from './private-files.ts'
+import { NextRecovery } from './recovery.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
 export const WEB_BUNDLES = [...PROFILE_TEMPLATES.web!.bundles, 'dsh-desktop-next']
@@ -28,13 +29,6 @@ export function parseFeatures(value: unknown): Features {
   return { remoteControl: features.remoteControl, market: features.market }
 }
 
-function atomicJson(path: string, value: unknown): void {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-  const temporary = `${path}.${randomUUID()}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: 'wx' })
-  renameSync(temporary, path)
-}
-
 export class NextProfiles {
   constructor(readonly home: string) {
     if (!isAbsolute(home)) throw new Error('Next home must be absolute')
@@ -51,8 +45,9 @@ export class NextProfiles {
   }
   get active(): string {
     const file = join(this.home, 'desktop-next.json')
-    if (!existsSync(file)) return 'default'
-    return profileName((JSON.parse(readFileSync(file, 'utf8')) as { active?: unknown }).active)
+    const text = readPrivateFile(file)
+    if (text === undefined) return 'default'
+    return profileName((JSON.parse(text) as { active?: unknown }).active)
   }
   select(name: string): void {
     if (!existsSync(join(this.directory(name), 'package.json'))) throw new Error('Profile does not exist')
@@ -80,7 +75,8 @@ export class NextProfiles {
   }
   features(name: string): Features {
     const file = join(this.directory(name), 'desktop-next.features.json')
-    return existsSync(file) ? parseFeatures(JSON.parse(readFileSync(file, 'utf8'))) : { ...DEFAULT_FEATURES }
+    const text = readPrivateFile(file)
+    return text === undefined ? { ...DEFAULT_FEATURES } : parseFeatures(JSON.parse(text))
   }
   setFeatures(name: string, value: unknown): void {
     atomicJson(join(this.directory(name), 'desktop-next.features.json'), parseFeatures(value))
@@ -90,10 +86,18 @@ export class NextProfiles {
     const dir = this.directory(name)
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     return withFileLock(join(dir, 'lock'), async () => {
-      const backup = sanitizeProfile('dsh-desktop-next', dir, WEB_BUNDLES)
+      const backup = new NextRecovery(this).backup(name, 'before-profile-repair')
+      let manifest: Record<string, unknown> = { name, private: true }
+      try {
+        const value: unknown = JSON.parse(readPrivateFile(join(dir, 'package.json')) ?? '{}')
+        if (value && typeof value === 'object' && !Array.isArray(value)) manifest = value as Record<string, unknown>
+      } catch { /* The original bytes have already been backed up. */ }
+      // Keep installed dependencies, but remove malformed activation metadata.
+      manifest.dsh = { profile: { bundles: WEB_BUNDLES } }
+      atomicJson(join(dir, 'package.json'), manifest)
+      atomicText(join(dir, 'cordis.patch.yml'), '[]\n')
       this.setFeatures(name, { remoteControl: false, market: false })
-      initProfile(dir, WEB_BUNDLES)
-      return backup
+      return readPrivateFile(join(backup, 'cordis.patch.yml')) === undefined ? undefined : join(backup, 'cordis.patch.yml')
     })
   }
 }

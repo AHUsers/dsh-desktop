@@ -3,6 +3,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 import { desktopNodeEnvironment } from './node-environment.ts'
+import { NOTIFICATION_OUTCOMES, type NotificationOutcome } from './desktop-contract.ts'
 
 interface ReadyEvent {
   readonly type: 'ready'
@@ -15,7 +16,7 @@ interface FatalEvent {
   readonly message: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' } | {
+type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'notification'; outcome: NotificationOutcome } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -34,8 +35,10 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
       return typeof candidate.url === 'string'
     case 'fatal':
       return typeof candidate.message === 'string'
+    case 'notification':
+      return NOTIFICATION_OUTCOMES.includes(candidate.outcome as NotificationOutcome)
     case 'desktop-action':
-      return candidate.action === 'restart'
+      return candidate.action === 'restart' || candidate.action === 'terminal'
     case 'update-tasks':
       return Number.isSafeInteger(candidate.requestId) && typeof candidate.active === 'boolean'
         && (candidate.error === undefined || typeof candidate.error === 'string')
@@ -107,6 +110,9 @@ export class DesktopHostProcess {
     private readonly packageManager?: { readonly pnpm: string; readonly nodeBin: string },
     private readonly hostEntry?: string,
     private readonly onRestart?: () => void,
+    private readonly onNotification?: (outcome: NotificationOutcome) => void,
+    private readonly onLog?: (chunk: string) => void,
+    private readonly onTerminal?: () => void,
   ) {}
 
   /**
@@ -132,7 +138,9 @@ export class DesktopHostProcess {
     })
     this.child = child
     child.stderr?.setEncoding('utf8')
-    child.stderr?.on('data', (chunk: string) => { this.stderr = (this.stderr + chunk).slice(-MAX_HOST_DIAGNOSTIC_CHARS) })
+    child.stderr?.on('data', (chunk: string) => { this.stderr = (this.stderr + chunk).slice(-MAX_HOST_DIAGNOSTIC_CHARS); this.onLog?.(chunk) })
+    child.stdout?.setEncoding('utf8')
+    child.stdout?.on('data', (chunk: string) => { this.onLog?.(chunk) })
     child.stdout?.pipe(process.stdout)
     child.on('message', (message: unknown) => {
       if (!isDesktopHostEvent(message)) {
@@ -146,8 +154,14 @@ export class DesktopHostProcess {
         else this.fail(new Error('dsh desktop host acknowledged an unrequested shutdown'))
       }
       else if (message.type === 'fatal') this.fail(new Error(message.message))
+      else if (message.type === 'notification') {
+        if (!this.stopping && !this.failureReported) this.onNotification?.(message.outcome)
+      }
       else if (message.type === 'desktop-action') {
-        if (!this.stopping && !this.failureReported) this.onRestart?.()
+        if (!this.stopping && !this.failureReported) {
+          if (message.action === 'restart') this.onRestart?.()
+          else this.onTerminal?.()
+        }
       }
       else {
         const query = this.taskQueries.get(message.requestId)

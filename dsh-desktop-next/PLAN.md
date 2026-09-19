@@ -8,7 +8,7 @@ The implementation uses an Electron shell, an Electron Node-mode Host,
 the authenticated WebServer and WebSocket transport, and the official published
 Web frontend without a fork. The basic macOS and Windows Desktop presentation
 comes from the same upstream reference. Additional features are named Profiles,
-recovery, the existing Agents Anywhere bridge, and the existing Community Market.
+the system tray, desktop settings and tools, recovery, the existing Agents Anywhere bridge, and the existing Community Market.
 Our own enhanced-window presentation remains deferred. Stable and Beta keep
 their current implementations.
 
@@ -23,3 +23,10 @@ application. The optional Electron smoke uses only its Node mode.
 This iteration targets a runnable development package. Signed installers,
 offline release seeds, automatic updates, data migration from Stable/Beta,
 and enhanced windows require separate release qualification.
+
+The tray and recovery controls are owned by Electron main independently of Host
+readiness. A separate ephemeral home implements non-destructive safe mode;
+configuration repair and rollback back up files before writing. The ordinary
+browser gate covers HTTP, fallback documents, and WebSocket upgrades. Optional
+LAN HTTPS uses the existing certificate and ingress boundaries with an OS-sealed
+CA key. The official Settings slot and fallback window share the same controls.

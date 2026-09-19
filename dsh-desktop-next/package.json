@@ -17,9 +17,10 @@
     "verify:host:electron": "node scripts/verify-host.mjs --electron",
     "verify:frontend": "node scripts/verify-frontend.mjs",
     "verify:window-controls": "node scripts/verify-window-controls.mjs",
-    "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host",
+    "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host && yarn verify:desktop-runtime",
     "dev": "yarn build && node scripts/start.mjs",
-    "start": "node scripts/start.mjs"
+    "start": "node scripts/start.mjs",
+    "verify:desktop-runtime": "node scripts/verify-desktop-runtime.mjs"
   },
   "dependencies": {
     "@agents-anywhere/dsh-bridge-next": "file:../vendor/agents-anywhere/agents-anywhere-dsh-bridge-next-0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2.tgz",
@@ -175,6 +176,7 @@
     "dsh-community-market": "0.1.0-dev.0",
     "pnpm": "11.8.0",
     "react": "18.3.1",
+    "selfsigned": "5.5.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

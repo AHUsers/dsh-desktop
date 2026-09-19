@@ -1,5 +1,16 @@
 /** Scoped additions for the alpha.2 pages without a conversation header. */
 const STYLES = `
+/* Respect the native-material preference without replacing official layout. */
+html[data-next-material='off'][data-platform='darwin'] :has(> [data-shell-overlay]) {
+  background: var(--dsw-alias-bg-base);
+}
+html[data-next-material='mica'][data-platform='win32'] :has(> [data-shell-overlay]) {
+  background: transparent;
+}
+html[data-next-material='mica'][data-platform='win32'] :has(> [data-shell-overlay])::before,
+html[data-next-material='mica'][data-platform='win32'] :has(> [data-shell-overlay]) > div:first-child {
+  background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 60%, transparent);
+}
 /* Pass the official frame's live column sizes through the overlay without
    changing its layout or any other overlay occupant. */
 html[data-platform='darwin'] [data-shell-overlay],

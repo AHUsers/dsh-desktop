@@ -63,7 +63,7 @@ try {
   assert.equal(state.status, 200, await state.clone().text())
   const stateBody = await state.json()
   assert.ok(Array.isArray(stateBody.sources))
-  assert.deepEqual(stateBody.desktopActions, { openTerminal: false, requestRestart: true })
+  assert.deepEqual(stateBody.desktopActions, { openTerminal: ['darwin', 'win32'].includes(process.platform), requestRestart: true })
   const call = async (path, body, expected = 200) => {
     const response = await fetch(`${origin}/api/community-market/${path}`, {
       method: body === undefined ? 'GET' : 'POST',
