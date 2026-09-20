@@ -1,7 +1,6 @@
-/** Add missing macOS window controls while retaining the official frontend. */
+/** Compose Next capabilities into the official frontend. */
 import { createElement, useEffect, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -21,27 +20,17 @@ import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'desktop.settings': DesktopSettingsLocaleKey
-    'desktop-next': 'sidebar.open' | 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery'
+    'desktop-next': 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery'
   }
 }
 
 export const inject = ['slots', 'layout', 'locale']
 
-function WindowControls({ toggleSidebar, t }: PropsLocale<'desktop-next'> & { toggleSidebar(): void }) {
-  return createElement('div', { className: 'dshNextWindowControls', 'data-next-window-controls': '' },
-    createElement('div', { className: 'dshNextWindowDrag', 'aria-hidden': true }),
-    createElement('button', {
-      type: 'button', className: 'dshNextSidebarOpen',
-      'aria-label': t('sidebar.open'), title: t('sidebar.open'), onClick: toggleSidebar,
-    }, createElement(IconPanelLeftOutline16, { size: 16 })),
-  )
-}
-
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('desktop-next', {
-    zh: { 'sidebar.open': '展开侧边栏', settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
-    en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
-  }), 'Next window control labels')
+    zh: { settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
+    en: { settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
+  }), 'Next settings and recovery labels')
   ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
   registerPluginControls(ctx)
@@ -69,11 +58,7 @@ export function apply(ctx: Context): void {
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))
   }
-  ctx.effect(installWindowStyles, 'Next window controls and drag regions')
-  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-    name: 'shell.overlay', id: 'desktop-next-window-controls', order: -100,
-    locale: 'desktop-next', inject: () => ({ toggleSidebar: () => ctx.layout.toggleSidebar() }),
-  }, WindowControls))
+  ctx.effect(installWindowStyles, 'Next native materials and header interactions')
 }
 
 function SafeModeNotice({ t }: PropsLocale<'desktop-next'>) {
