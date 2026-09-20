@@ -4482,6 +4482,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-host-open-in-app@patch:@deepseek-ai/dsh-host-open-in-app@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-host-open-in-app-0.1.6-alpha.2.tgz#./patches/dsh-host-open-in-app@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-host-open-in-app@patch:@deepseek-ai/dsh-host-open-in-app@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-host-open-in-app-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-host-open-in-app-0.1.6-alpha.2.tgz%3A%3Ahash=62778a&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-host-open-in-app@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=18f68e&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    "@deepseek-ai/dsh-launch-environment": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/dsh-native-command": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/dsh-subprocess": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.2"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+  checksum: 10c0/e1003b689ea0b5cd9e50061d21862c5dc884dd05a47cde1b1dc82092dfbf19825b8c87b7ee9196372dd9c19f90a4f4aa34e763bf8875ecabe9b7a806a32b9ecc
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-host-plugin-inventory@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-host-plugin-inventory-0.1.5-rc.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.5-rc.2
   resolution: "@deepseek-ai/dsh-host-plugin-inventory@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-host-plugin-inventory-0.1.5-rc.2.tgz#vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-host-plugin-inventory-0.1.5-rc.2.tgz::hash=bca37a&locator=deepseek-harness-desktop%40workspace%3A."
@@ -13651,6 +13665,7 @@ __metadata:
     "@deepseek-ai/dsh-host-directory-picker": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-host-directory-picker-browse": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-host-directory-picker-native": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-host-open-in-app": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-host-plugin-inventory": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-host-webserver": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-http-proxy": "npm:0.1.6-alpha.2"
