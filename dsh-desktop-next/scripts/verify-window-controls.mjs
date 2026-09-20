@@ -180,6 +180,33 @@ try {
   // The independent Plugins panel needs the same escape and a drag strip above its actions.
   await page.getByRole('button', { name: /^(插件|Plugins)$/ }).click()
   await page.locator('[data-plugin-panel]').waitFor({ state: 'visible' })
+  // These cards and switches are rendered entirely by the official bundle manager.
+  const optionalPackages = ['dsh-community-market', 'dshmarket', '@agents-anywhere/dsh-bridge-next']
+  for (const name of optionalPackages) {
+    const card = page.locator(`[data-plugin-package="${name}"]`)
+    await card.waitFor({ state: 'visible' })
+    const toggle = card.getByRole('switch')
+    assert.equal(await toggle.isChecked(), false)
+    await toggle.click()
+    await page.waitForFunction(name => document.querySelector(`[data-plugin-package="${name}"] [role="switch"]`)?.getAttribute('aria-checked') === 'true', name)
+    await card.getByRole('button').click()
+    const detail = page.locator(`[data-plugin-detail="${name}"]`)
+    await detail.locator('[data-plugin-rows]').waitFor()
+    assert.equal(await detail.getByRole('button', { name: /卸载|Uninstall/ }).count(), 0)
+    await page.getByRole('button', { name: /^(返回插件列表|Back to plugins)$/ }).click()
+  }
+  const marketFooter = footer.getByRole('button', { name: /插件市场|Plugin market/ })
+  await marketFooter.waitFor()
+  await page.screenshot({ path: join(screenshots, 'managed-market-plugins.png'), animations: 'disabled' })
+  await page.getByRole('button', { name: /^(设置|Settings)$/ }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /^(插件市场|Plugin Market)$/ }).waitFor()
+  await page.getByRole('button', { name: /^(关闭|Close)$/ }).click()
+  for (const name of optionalPackages) {
+    const card = page.locator(`[data-plugin-package="${name}"]`)
+    await card.getByRole('switch').click()
+    await page.waitForFunction(name => document.querySelector(`[data-plugin-package="${name}"] [role="switch"]`)?.getAttribute('aria-checked') === 'false', name)
+  }
+  await marketFooter.waitFor({ state: 'hidden' })
   const cua = page.locator('[data-plugin-item="desktop-next-computer-use"]')
   await cua.waitFor({ state: 'visible' })
   await cua.scrollIntoViewIfNeeded()
@@ -254,7 +281,7 @@ try {
   assert.equal(await settings.locator('nav').count(), 0)
   assert.equal(await settings.getByRole('radio', { name: /^broken/ }).getAttribute('aria-disabled'), 'true')
   assert.equal(await settings.getByRole('radio', { name: /增强模式|扩展模式|Advanced mode|Extended mode/ }).count(), 0)
-  assert.equal(await settings.getByRole('radio', { name: /dsh-market/ }).count(), 0)
+  assert.equal(await settings.locator('#dsh-desktop-market-title, #dsh-desktop-aa-title').count(), 0)
   const closeToTray = settings.getByRole('switch', { name: /关闭窗口后保持后台运行|Keep running after closing the window/ })
   assert.equal(await closeToTray.isChecked(), true)
   await closeToTray.click()
@@ -290,9 +317,6 @@ try {
   await actions.getByRole('button', { name: /打开 DSH 终端|Open DSH Terminal/ }).waitFor({ state: 'hidden' })
   controlState.platform = 'darwin'
   await actions.getByRole('button', { name: /打开 DSH 终端|Open DSH Terminal/ }).waitFor({ state: 'visible' })
-  await settings.getByRole('radio', { name: /dsh-community-market/ }).click()
-  await page.waitForFunction(() => [...document.querySelectorAll('[role="radio"]')].some(el => /dsh-community-market/.test(el.textContent) && el.getAttribute('aria-checked') === 'true'))
-  assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
   // Each local/LAN login link has its own row and native open/copy target.
   const webSettings = settings.locator('section[aria-labelledby="dsh-desktop-web-title"]')
   const browserAccess = webSettings.getByRole('switch', { name: /允许在浏览器中打开|Allow opening this Profile in a browser/ })

@@ -6,9 +6,3 @@
     - id: computer-use-cua-driver-native
       name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
       disabled: true
-    - id: community-market
-      name: dsh-community-market
-      disabled: true
-    - id: agents-anywhere-bridge-next
-      name: '@agents-anywhere/dsh-bridge-next'
-      disabled: true

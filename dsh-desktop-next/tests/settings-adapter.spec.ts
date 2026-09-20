@@ -60,10 +60,10 @@ it('maps only supported features and available Profiles to the shared settings A
   const view = await adapter.api.read()
   expect(view.profiles.find(item => item.name === 'broken')?.selectable).toBe(false)
   expect(view.profiles.find(item => item.name === 'default')?.deletable).toBe(false)
-  await expect(adapter.api.selectMarket('dsh-market')).rejects.toThrow('unavailable')
+  await expect(adapter.api.selectMarket('dsh-market')).rejects.toThrow('Plugins page')
   expect(commands).toEqual([])
   state.safeMode = true
-  await expect(adapter.api.selectAa!(true)).rejects.toThrow('safe mode')
+  expect(adapter.api.selectAa).toBeUndefined()
   expect(projectSettings(state).market.effective).toBe('disabled')
   await adapter.api.selectProfile('work')
   expect((await adapter.api.read()).current).toBe('work')

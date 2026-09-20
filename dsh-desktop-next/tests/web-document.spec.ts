@@ -54,7 +54,7 @@ it('forwards upload bytes and cancellation with Host credentials while keeping t
   const [target, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit]
   expect(target.href).toBe('http://127.0.0.1:1234/api/upload?name=file')
   expect(new Headers(init.headers).get('cookie')).toBe('session=owned')
-  expect(new Headers(init.headers).get('origin')).toBeNull()
+  expect(new Headers(init.headers).get('origin')).toBe('http://127.0.0.1:1234')
   expect(init.signal).toBe(request.signal)
   expect(init.body).toBe(request.body)
   expect(response.headers.get('set-cookie')).toBeNull()
@@ -71,11 +71,11 @@ it('refuses another page origin without forwarding its request', async () => {
   expect(fetch).not.toHaveBeenCalled()
 })
 
-it.each(['sources', 'operations/preview', 'operations/execute'])('forwards native Market %s without an Origin header', async path => {
+it.each(['/api/community-market/sources', '/api/community-market/operations/preview', '/api/community-market/operations/execute', '/dsh-market/update', '/other-plugin/mutation'])('forwards native plugin route %s without an Origin header', async path => {
   const fetch = vi.fn().mockResolvedValue(new Response('{}'))
   vi.stubGlobal('fetch', fetch)
   // The main-process network hook supplies the marker even when Origin is absent.
-  const request = ownedRequest(`dsh-app://app/api/community-market/${path}`, {
+  const request = ownedRequest(`dsh-app://app${path}`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
   })
   const response = await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)

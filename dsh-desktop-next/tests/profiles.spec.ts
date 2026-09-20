@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it } from 'vitest'
 import { composeEntries, loadOverlayPatches, readProfilePatches } from '@deepseek-ai/dsh-app-boot'
-import { AA_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, profileName, WEB_BUNDLES } from '../src/profiles.ts'
+import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, profileName, WEB_BUNDLES } from '../src/profiles.ts'
 
 const roots: string[] = []
 function profiles() { const home = mkdtempSync(join(tmpdir(), 'dsh-next-profiles-')); roots.push(home); return new NextProfiles(home) }
@@ -57,11 +57,12 @@ it('recovers without parsing broken patches or deleting plugin packages and home
 it('composes optional AA and Market while retaining the official Web layout', () => {
   const manager = profiles()
   const dir = manager.ensure('default')
-  manager.setFeatures('default', { remoteControl: true, market: true })
+  manager.setFeatures('default', { remoteControl: true, market: true, dshMarket: true })
   const profile = loadNextProfile(dir, manager.home)
   const rows = composeEntries([...profile.layers.map(layer => layer.patches), loadOverlayPatches('next', join(dir, 'desktop-next.cordis.patch.json'))])
   expect(rows.some(row => row.name === AA_PACKAGE && !row.disabled)).toBe(true)
-  expect(rows.some(row => row.name === 'dsh-community-market' && !row.disabled)).toBe(true)
+  expect(rows.some(row => row.name === COMMUNITY_MARKET_PACKAGE && !row.disabled)).toBe(true)
+  expect(rows.some(row => row.name === DSH_MARKET_PACKAGE && !row.disabled)).toBe(true)
   expect(rows.some(row => row.id === 'ui-layout' && !row.disabled)).toBe(true)
   expect(rows.some(row => row.name === '@deepseek-ai/dsh-computer-use' && !row.disabled)).toBe(true)
   expect(rows.some(row => row.name === '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native' && row.disabled)).toBe(true)
@@ -103,4 +104,32 @@ it('marks broken or non-Next Profiles unavailable without modifying or loading t
   expect(() => manager.select('broken')).toThrow('unavailable')
   expect(manager.active).toBe('default')
   expect(readFileSync(join(broken, 'package.json'), 'utf8')).toBe('{broken')
+})
+
+
+it('migrates legacy switches once and preserves later official plugin selections across restarts', () => {
+  const manager = profiles()
+  const dir = manager.ensure('default')
+  const file = join(dir, 'package.json')
+  const manifest = JSON.parse(readFileSync(file, 'utf8'))
+  delete manifest.dsh.desktopNextPlugins
+  manifest.dsh.profile.bundles = [...WEB_BUNDLES, DSH_MARKET_PACKAGE]
+  manifest.dependencies = { 'my-plugin': '1.0.0' }
+  manifest.custom = 'keep'
+  writeFileSync(file, JSON.stringify(manifest))
+  writeFileSync(join(dir, 'desktop-next.features.json'), JSON.stringify({ market: false, remoteControl: true }))
+  manager.ensure('default')
+  expect(manager.features('default')).toEqual({ market: false, remoteControl: true, dshMarket: true })
+  const migrated = JSON.parse(readFileSync(file, 'utf8'))
+  expect(migrated).toMatchObject({ dependencies: manifest.dependencies, custom: 'keep' })
+  // The official manager writes the bundle list, with no shell feature flag write.
+  migrated.dsh.profile.bundles = [...WEB_BUNDLES, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE]
+  writeFileSync(file, JSON.stringify(migrated))
+  manager.ensure('default')
+  loadNextProfile(dir, manager.home)
+  expect(manager.features('default')).toEqual({ market: true, remoteControl: false, dshMarket: true })
+  const overlay = JSON.parse(readFileSync(join(dir, 'desktop-next.cordis.patch.json'), 'utf8'))
+  expect(overlay.every((row: object) => !Object.hasOwn(row, 'disabled'))).toBe(true)
+  manager.create('work')
+  expect(manager.features('work')).toEqual({ market: true, remoteControl: false })
 })
