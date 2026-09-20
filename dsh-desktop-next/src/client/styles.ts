@@ -1,5 +1,8 @@
 /** Scoped additions for the alpha.2 pages without a conversation header. */
 const STYLES = `
+.dshNextSafeModeNotice{position:absolute;right:16px;bottom:16px;max-width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3);border-radius:10px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:12px/1.5 system-ui,sans-serif;pointer-events:auto;-webkit-app-region:no-drag}
+.dshNextSafeModeNotice p{margin:5px 0 8px}.dshNextSafeModeNotice button{font:inherit;border:1px solid currentColor;border-radius:5px;padding:4px 8px;background:transparent;color:inherit;cursor:pointer}
+
 /* Respect the native-material preference without replacing official layout. */
 html[data-next-material='off'][data-platform='darwin'] :has(> [data-shell-overlay]) {
   background: var(--dsw-alias-bg-base);

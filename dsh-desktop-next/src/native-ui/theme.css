@@ -1,0 +1,16 @@
+@import '../../../dsh-plugin-desktop-beta/src/native-ui/shared/theme.css';
+@source '../../../dsh-plugin-desktop-beta/src/native-ui';
+/* Map the official Settings tokens onto the existing native-window theme. */
+:root {
+  --dsw-alias-label-primary: var(--foreground);
+  --dsw-alias-label-secondary: var(--muted-foreground);
+  --dsw-alias-label-primary-foreground: var(--primary-foreground);
+  --dsw-alias-bg-base: var(--background);
+  --dsw-alias-bg-layer-1: var(--card);
+  --dsw-alias-bg-layer-2: var(--muted);
+  --dsw-alias-border-l1: var(--border);
+  --dsw-alias-border-l2: var(--border);
+  --dsw-alias-interactive-bg-hover: var(--muted);
+  --dsw-alias-brand-primary: var(--primary);
+  --dsw-alias-state-error-primary: var(--destructive);
+}

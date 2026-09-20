@@ -44,6 +44,9 @@ vi.mock('electron', async () => {
     hide() { this.visible = false }
     focus() {}
     setSize() {}
+    setResizable() {}
+    setMinimumSize() {}
+    close() { this.emit('closed') }
     setVibrancy() {}
     setBackgroundColor() {}
     setBackgroundMaterial() {}
@@ -107,7 +110,7 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls' })
     expect(fixture.windows).toHaveLength(2)
     const controls = fixture.windows[1]
-    expect(controls.webContents.mainFrame.url).toBe('dsh-app://shell/index.html?lang=zh#general')
+    expect(controls.webContents.mainFrame.url).toBe(`dsh-app://shell/index.html?locale=zh&platform=${process.platform}&frame=${process.platform !== 'linux'}#general`)
     expect(state({ sender: controls.webContents, senderFrame: controls.webContents.mainFrame }).failure).toBe('Fixture Host failure')
     fixture.handlers.get('dsh-next:locale')!({ ...sender, senderFrame: {} }, 'en')
     expect(tray.menu[0].label).toBe('打开 DSH Desktop Next')
@@ -138,7 +141,7 @@ it('boots directly into recovery without starting a Host or loading the official
     await import('../src/main.ts')
     await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
     const controls = fixture.windows[0]
-    expect(controls.webContents.mainFrame.url).toBe('dsh-app://shell/index.html?lang=zh#recovery')
+    expect(controls.webContents.mainFrame.url).toBe(`dsh-app://shell/index.html?locale=zh&platform=${process.platform}&frame=${process.platform !== 'linux'}#recovery`)
     const sender = { sender: controls.webContents, senderFrame: controls.webContents.mainFrame }
     expect(fixture.handlers.get('dsh-next:state')!(sender).phase).toBe('recovery')
     expect(fixture.trays[0].tooltip).toContain('recovery')

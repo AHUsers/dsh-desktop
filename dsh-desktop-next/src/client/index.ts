@@ -1,5 +1,5 @@
 /** Add missing macOS window controls while retaining the official frontend. */
-import { createElement, useEffect, useRef, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -7,13 +7,15 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import { mountDesktopControls } from '../controls/view.ts'
-import { DESKTOP_CONTROLS_CSS } from '../controls/styles.ts'
+import { installDesktopSettingsStyles } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-styles.ts'
+import { NextSettingsAdapter } from './settings-adapter.ts'
+import { NextDesktopSettings, NextDesktopActions } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
-import { DesktopSettingsActions } from './settings-actions.ts'
+import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
+    'desktop.settings': DesktopSettingsLocaleKey
     'desktop-next': 'sidebar.open' | 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery'
   }
 }
@@ -36,19 +38,15 @@ export function apply(ctx: Context): void {
     en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
   }), 'Next window control labels')
   if (window.desktopNext) {
-    ctx.effect(() => {
-      const style = document.createElement('style')
-      style.textContent = DESKTOP_CONTROLS_CSS
-      document.head.append(style)
-      return () => style.remove()
-    }, 'Next desktop settings styles')
+    const adapter = new NextSettingsAdapter(window.desktopNext)
+    ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
     const t = ctx.locale.bind('desktop-next')
     ctx.slots.inject('settings.section', () => ctx.slots.register({
-      name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'),
+      name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),
     }, DesktopSettings))
     ctx.slots.inject('settings.action', () => ctx.slots.register({
-      name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next',
-    }, DesktopSettingsActions))
+      name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next', inject: () => ({ adapter }),
+    }, SettingsActions))
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))
@@ -73,11 +71,10 @@ function SafeModeNotice({ t }: PropsLocale<'desktop-next'>) {
   ) : null
 }
 
-function DesktopSettings({ t }: PropsLocale<'desktop-next'>) {
-  const root = useRef<HTMLDivElement>(null)
-  const language = t('language')
-  useEffect(() => {
-    if (root.current && window.desktopNext) return mountDesktopControls(root.current, window.desktopNext, language)
-  }, [language])
-  return createElement('div', { ref: root, 'data-next-desktop-settings': '' })
+function DesktopSettings({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
+  return createElement(NextDesktopSettings, { adapter, language: t('language') })
+}
+
+function SettingsActions({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
+  return createElement(NextDesktopActions, { adapter, language: t('language') })
 }

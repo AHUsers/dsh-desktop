@@ -55,10 +55,10 @@ export type DesktopCommand =
   | { type: 'features'; features: Features }
   | { type: 'preferences'; preferences: DesktopPreferences }
   | { type: 'controls'; page?: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' }
-  | { type: 'restart-app' | 'restart-recovery' }
+  | { type: 'restart-app' | 'restart-recovery' | 'close-controls' }
   | { type: 'restart' | 'recover' | 'safe-mode' | 'normal-mode' | 'rollback' | 'repair-global'
     | 'reload' | 'devtools' | 'terminal' | 'open-home' | 'open-profile' | 'open-logs' | 'open-backups'
-    | 'diagnostics' | 'open-browser' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }
+    | 'diagnostics' | 'open-browser' | 'open-lan' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }
 
 export interface DesktopBridge {
   state(): Promise<DesktopState>
