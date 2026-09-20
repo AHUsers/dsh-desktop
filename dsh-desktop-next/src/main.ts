@@ -95,6 +95,7 @@ function show(window: BrowserWindow): void {
 function createWindow(preload: string, primary = false): BrowserWindow {
   const window = new BrowserWindow({ width: 1280, height: 840, minWidth: 800, minHeight: 580,
     show: false, title: 'DSH Desktop Next',
+    ...(process.platform !== 'darwin' ? { icon: join(root, 'build', process.platform === 'win32' ? 'app-icon.ico' : 'app-icon.png') } : {}),
     ...(!primary ? auxiliaryWindowChromeOptions() : {}),
     ...(process.platform === 'win32' && primary ? {
       titleBarStyle: 'hidden' as const,
@@ -292,6 +293,7 @@ async function command(value: unknown): Promise<void> {
 async function main(): Promise<void> {
   await app.whenReady()
   if (quitting) return
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(root, 'build', 'app-icon-mac.png'))
   windowsLanguage = app.getLocale()
   protocol.handle('dsh-app', async request => {
     const url = new URL(request.url)

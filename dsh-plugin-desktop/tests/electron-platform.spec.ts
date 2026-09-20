@@ -3,6 +3,7 @@ import { electronPlatformStrategy } from '../src/electron-platform.ts'
 
 const electron = vi.hoisted(() => ({
   app: {
+    isPackaged: false,
     dock: {
       setIcon: vi.fn(),
     },
@@ -31,6 +32,7 @@ function createWindow(): {
 
 describe('electronPlatformStrategy', () => {
   beforeEach(() => {
+    electron.app.isPackaged = false
     electron.app.dock.setIcon.mockClear()
     electron.Menu.buildFromTemplate.mockClear()
     electron.Menu.setApplicationMenu.mockClear()
@@ -77,6 +79,14 @@ describe('electronPlatformStrategy', () => {
     expect(electron.Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
     expect(window.removeMenu).not.toHaveBeenCalled()
     expect(window.setBackgroundMaterial).not.toHaveBeenCalled()
+  })
+
+  it('preserves the bundled native Composer icon in packaged macOS apps', () => {
+    electron.app.isPackaged = true
+    const strategy = electronPlatformStrategy('darwin')
+    strategy.configureApplication({} as never, 'DSH Desktop')
+    expect(electron.app.dock.setIcon).not.toHaveBeenCalled()
+    expect(electron.Menu.setApplicationMenu).toHaveBeenCalledOnce()
   })
 
   it('selects the Linux adapter without desktop chrome tweaks', () => {
