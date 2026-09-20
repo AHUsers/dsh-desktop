@@ -1,6 +1,7 @@
 /** Headless owner of the Host, desktop preferences, Profiles and recovery. */
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
+import { cleanupDisposableTree } from '../../dsh-plugin-desktop-beta/src/disposable-tree.ts'
 import { join } from 'node:path'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
@@ -97,7 +98,7 @@ export class NextDesktopRuntime {
     await this.backend.stop()
     if (this.closing) return
     await change()
-    if (!this.safeMode && this.safeHome) { rmSync(this.safeHome, { recursive: true, force: true }); this.safeHome = undefined }
+    if (!this.safeMode) this.cleanupSafeHome()
     await this.start()
   }
 
@@ -196,8 +197,21 @@ export class NextDesktopRuntime {
   async close(): Promise<void> {
     this.closing = true
     await this.backend.close()
-    if (this.safeHome) { rmSync(this.safeHome, { recursive: true, force: true }); this.safeHome = undefined }
+    this.cleanupSafeHome()
     this.diagnostics.flush()
+  }
+
+  private cleanupSafeHome(): void {
+    const home = this.safeHome
+    if (!home) return
+    this.safeHome = undefined
+    try {
+      // Share Stable/Beta's explicit junction unlinking and bounded retries.
+      cleanupDisposableTree(home)
+    } catch (error) {
+      // Temporary files must not prevent relaunch or returning to the original Profile.
+      this.diagnostics.append(`Safe mode temporary directory cleanup failed (${home}): ${String(error)}`, 'warn')
+    }
   }
 
   private createHost(onFailure: (error: Error) => void) {
