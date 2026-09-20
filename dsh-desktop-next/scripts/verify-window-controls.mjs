@@ -55,6 +55,9 @@ try {
       turnCompleted: true, turnFailed: true, jobCompleted: false, jobFailed: false },
     phase: 'ready', busy: false, failure: '', safeMode: false, home: '[temporary test home]', platform: 'darwin',
     version: '0.1.0-dev.0', trayAvailable: true, notificationsAvailable: true, windowsMicaSupported: false, browserUrl: null, lan: null,
+    recovery: { bundles: [{ bundleId: 'fixture-plugin', packageName: 'fixture-plugin', owner: 'profile', status: 'active', action: 'uninstall' }],
+      checkpoints: [{ id: 'fixture-checkpoint', created: new Date().toISOString(), fileCount: 3, totalBytes: 128 }],
+      profileDirectory: '[temporary profile]', usingDefaultDirectory: true },
     checkpoint: { created: new Date().toISOString() }, logs: 'Headless UI fixture; native actions are recorded only.',
   }
   await context.exposeFunction('__nextTestState', () => structuredClone(controlState))
@@ -75,6 +78,9 @@ try {
   await context.exposeFunction('__nextTestCommand', command => {
     if (command.type === 'preferences' && rejectPreference) { rejectPreference = false; throw new Error('Fixture: preference save rejected') }
     controlCommands.push(command)
+    if (command.type === 'recovery-action' && command.action === 'preview-checkpoint') {
+      controlState.recovery.notice = { tone: 'success', title: '检查点已恢复', body: '配置和所需插件依赖已恢复。请点击“退出并重启”使恢复生效。' }
+    }
     if (command.type === 'preferences') {
       controlState.preferences = command.preferences
       controlState.browserUrl = command.preferences.browserAccess ? streamBaseUrl + '/' : null
@@ -604,11 +610,26 @@ try {
   await recoveryPage.getByRole('tab', { name: '快速恢复' }).waitFor()
   assert.equal(await recoveryPage.getByText(controlState.failure, { exact: true }).textContent(), controlState.failure)
   assert.equal(await recoveryPage.locator('pre script').count(), 0)
-  assert.equal(await recoveryPage.getByRole('tab').count(), 4)
+  assert.equal(await recoveryPage.getByRole('tab').count(), 6)
+  await recoveryPage.getByRole('link', { name: '退出并重启', exact: true }).click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'recovery-action', action: 'restart' })
   await recoveryPage.getByRole('link', { name: '进入安全模式', exact: true }).click()
   assert.equal(controlCommands.at(-1).type, 'safe-mode')
   await recoveryPage.screenshot({ path: join(screenshots, 'recovery-assistant.png'), animations: 'disabled', fullPage: true })
+  await recoveryPage.getByRole('tab', { name: /插件/ }).click()
+  await recoveryPage.locator('a[href*="preview-uninstall"]').click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'recovery-action', action: 'preview-uninstall', id: 'fixture-plugin' })
+  await recoveryPage.getByRole('tab', { name: /回滚/ }).click()
+  await recoveryPage.locator('a[href*="preview-checkpoint"]').click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'recovery-action', action: 'preview-checkpoint', id: 'fixture-checkpoint' })
+  await recoveryPage.locator('[data-sonner-toast]').getByText('检查点已恢复', { exact: true }).waitFor()
+  await recoveryPage.getByText('配置和所需插件依赖已恢复。请点击“退出并重启”使恢复生效。', { exact: true }).waitFor()
+  await recoveryPage.getByRole('tab', { name: /数据/ }).click()
+  await recoveryPage.locator('a[href*="begin-change-data-directory"]').click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'recovery-action', action: 'begin-change-data-directory' })
   await recoveryPage.getByRole('tab', { name: /诊断/ }).click()
+  await recoveryPage.locator('a[href*="open-profile-manifest"]').click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'recovery-action', action: 'open-profile-manifest' })
   await recoveryPage.getByRole('link', { name: /保存诊断|导出诊断/ }).click()
   assert.equal(controlCommands.at(-1).type, 'diagnostics')
   assert.deepEqual(recoveryErrors, [])
@@ -628,8 +649,10 @@ try {
   await page.reload()
   await page.locator('.dshNextSafeModeNotice').waitFor({ state: 'visible' })
   await page.getByRole('button', { name: /^(稍后配置|Configure later)$/ }).click()
-  await page.locator('.dshNextSafeModeNotice button').click()
+  await page.locator('.dshNextSafeModeNotice').getByRole('button', { name: /打开恢复助手|Open recovery assistant/ }).click()
   assert.deepEqual(controlCommands.at(-1), { type: 'controls', page: 'recovery' })
+  await page.locator('.dshNextSafeModeNotice').getByRole('button', { name: /关闭提示|Dismiss notice/ }).click()
+  await page.locator('.dshNextSafeModeNotice').waitFor({ state: 'detached' })
   // The marker-free Web frontend must not inherit any native Settings actions.
   const webContext = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1280, height: 840 } })
   await webContext.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])

@@ -56,6 +56,15 @@ export interface DesktopState {
   windowsMicaSupported: boolean
   browserUrl: string | null
   lan: DesktopLanHttpsRuntimeSnapshot | null
+  recovery?: {
+    bundles: { bundleId: string; packageName: string; status: 'active' | 'disabled'; owner: 'core' | 'profile'; action: 'uninstall' | null }[]
+    checkpoints: { id: string; created: string; fileCount: number; totalBytes: number }[]
+    error?: string
+    profileDirectory: string
+    usingDefaultDirectory: boolean
+    notice?: { tone: 'success'; title: string; body: string }
+    diagnosticsFile?: string
+  }
   checkpoint: { created: string } | null
   logs: string
 }
@@ -67,6 +76,7 @@ export interface DesktopBrowserLinks {
 }
 
 export type DesktopCommand =
+  | { type: 'recovery-action'; action: string; id?: string }
   | ({ type: 'onboarding-complete'; profile: string } & OnboardingChoices)
   | { type: 'onboarding-skip'; profile: string }
   | { type: 'open-browser-url' | 'copy-browser-url'; url: string }

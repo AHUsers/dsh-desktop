@@ -21,7 +21,7 @@ import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'desktop.settings': DesktopSettingsLocaleKey
-    'desktop-next': 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery'
+    'desktop-next': 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
   }
 }
 
@@ -29,8 +29,8 @@ export const inject = ['slots', 'layout', 'locale']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('desktop-next', {
-    zh: { settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
-    en: { settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
+    zh: { settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', dismiss: '关闭提示', recovery: '打开恢复助手' },
+    en: { settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', dismiss: 'Dismiss notice', recovery: 'Open recovery assistant' },
   }), 'Next settings and recovery labels')
   ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
@@ -71,6 +71,7 @@ function SafeModeNotice({ t }: PropsLocale<'desktop-next'>) {
     return () => { disposed = true }
   }, [])
   return safe ? createElement('aside', { className: 'dshNextSafeModeNotice', 'aria-label': t('safeMode') },
+    createElement('button', { type: 'button', className: 'dshNextSafeModeDismiss', 'aria-label': t('dismiss'), onClick: () => setSafe(false) }, '×'),
     createElement('strong', null, t('safeMode')), createElement('p', null, t('safeModeDetail')),
     createElement('button', { type: 'button', onClick: () => { void window.desktopNext?.command({ type: 'controls', page: 'recovery' }).catch(() => {}) } }, t('recovery')),
   ) : null

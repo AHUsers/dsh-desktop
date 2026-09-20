@@ -101,6 +101,17 @@ export class NextDesktopRuntime {
     await this.start()
   }
 
+  /** Native repair tools target the original Profile; app tools follow the running environment. */
+  terminalTarget(repair = false): { homeDir: string; profileDir: string; profileName: string; mode: 'normal' | 'safe' | 'recovery' } {
+    if (this.closing) throw new Error('Next is shutting down')
+    const safe = this.safeMode && !repair
+    if (safe && !this.safeHome) throw new Error('Safe mode environment is not ready')
+    const homeDir = safe ? this.safeHome! : this.options.home
+    const profileName = safe ? DEFAULT_PROFILE : this.selected
+    return { homeDir, profileName, profileDir: new NextProfiles(homeDir).directory(profileName),
+      mode: safe ? 'safe' : repair || this.recoveryMode ? 'recovery' : 'normal' }
+  }
+
   writePreferences(value: unknown): void {
     this.preferences = this.settings.write(parsePreferences(value))
     this.diagnostics.level = this.preferences.logLevel

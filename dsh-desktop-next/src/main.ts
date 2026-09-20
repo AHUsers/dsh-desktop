@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, Notification, protocol, safeStorage, session, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { appRequestHeaders, forwardWebRequest, serveWebDocument } from './web-document.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
@@ -18,16 +18,21 @@ import { NativeDesktop, applyWindowMaterial } from './native-desktop.ts'
 import { desktopLanAddresses } from './lan-addresses.ts'
 import { createLanHttpsCertificate } from './lan-https-certificate.ts'
 import { desktopTerminalStateDirectory, openDesktopTerminal } from './desktop-terminal.ts'
-import { bundledPnpmEntry } from './extensions.ts'
+import { bundledPnpmEntry, createPackageRunner } from './extensions.ts'
 import { auxiliaryWindowChromeOptions, auxiliaryWindowHasCustomFrame } from '../../dsh-plugin-desktop-beta/src/auxiliary-window-options.ts'
-import { privateDirectory } from './private-files.ts'
+import { atomicJson, privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
 import { ONBOARDING_ARGUMENT, RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
 import { createNativePermissions, installMediaPermissions } from './electron-permissions.ts'
+import { readDataDirectory, validateDataDirectory } from './data-directory.ts'
+import { maskSecrets } from './mask-secrets.ts'
 import { NativeSidebarBrowser } from './sidebar-browser.ts'
 
 const root = dirname(NEXT_PACKAGE)
-const home = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
+const defaultHome = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
+const locationFile = join(defaultHome, 'desktop-next-location.json')
+const dataLocation = readDataDirectory(defaultHome)
+const home = dataLocation.home
 const electronData = join(home, 'electron-user-data')
 privateDirectory(electronData)
 app.setName('DSH Desktop Next')
@@ -39,6 +44,11 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'dsh-app', privileges: {
 let mainWindow: BrowserWindow | undefined
 let sidebarBrowser: NativeSidebarBrowser | undefined
 let shellWindow: BrowserWindow | undefined
+let recoveryRunner: ReturnType<typeof createPackageRunner> | undefined
+let replacingWindow = false
+let diagnosticsFile: string | undefined
+let recoveryNotice: NonNullable<DesktopState['recovery']>['notice']
+let recoveryStopping: Promise<void> = Promise.resolve()
 let pendingSettings: DesktopSettingsPage | undefined
 let quitting = false
 let onboarding = false
@@ -77,7 +87,16 @@ const native = new NativeDesktop({ root, language: () => windowsLanguage, state,
 const permissions = createNativePermissions()
 
 function state(): DesktopState {
-  return { ...runtime.state(), onboarding, ...(onboarding ? { onboardingComputerUse } : {}), platform: process.platform, version,
+  let recovery: DesktopState['recovery']
+  try {
+    recovery = { bundles: [], checkpoints: runtime.recovery.checkpoints(runtime.selected),
+      profileDirectory: runtime.profiles.directory(runtime.selected), usingDefaultDirectory: home === defaultHome, diagnosticsFile, notice: recoveryNotice }
+    try { recovery.bundles = runtime.recovery.bundles(runtime.selected) } catch (error) { recovery.error = String(error) }
+  } catch (error) {
+    recovery = { bundles: [], checkpoints: [], profileDirectory: join(home, 'profiles', runtime.selected),
+      usingDefaultDirectory: home === defaultHome, error: String(error), diagnosticsFile, notice: recoveryNotice }
+  }
+  return { ...runtime.state(), recovery, onboarding, ...(onboarding ? { onboardingComputerUse } : {}), platform: process.platform, version,
     trayAvailable: native.available, notificationsAvailable: Notification.isSupported(), windowsMicaSupported: process.platform === 'win32' && supportsMica() }
 }
 function run(value: DesktopCommand): void { void command(value).catch(error => runtime.report(error)) }
@@ -147,6 +166,18 @@ function openSettings(page: DesktopSettingsPage = 'general'): void {
 function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' | 'onboarding' = 'general'): void {
   if (quitting) return
   if (page === 'general' || page === 'tools' || page === 'permissions') { openSettings(page === 'permissions' ? 'permissions' : 'general'); return }
+  if (page === 'recovery' && !runtime.safeMode && !runtime.recoveryMode) {
+    runtime.recoveryMode = true
+    onboarding = false
+    // Destroy bypasses the normal close-to-tray/app-quit handler.
+    const previousMain = mainWindow
+    mainWindow = undefined
+    replacingWindow = true
+    try { previousMain?.destroy() } finally { replacingWindow = false }
+    recoveryStopping = runtime.backend.stop()
+    void recoveryStopping.catch(error => runtime.diagnostics.append(String(error), 'error'))
+    native.refresh()
+  }
   const url = `${SHELL_URL}?locale=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}&platform=${process.platform}&frame=${auxiliaryWindowHasCustomFrame()}#${page}`
   const resize = (window: BrowserWindow): void => {
     const creating = page === 'create-profile'
@@ -168,7 +199,7 @@ function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' 
 }
 function openMain(): void {
   if (quitting) return
-  if (runtime.recoveryMode) { openControls('recovery'); return }
+  if (runtime.recoveryMode || runtime.state().phase === 'error') { openControls('recovery'); return }
   if (onboarding) { openControls('onboarding'); return }
   if (mainWindow && !mainWindow.isDestroyed()) { show(mainWindow); return }
   mainWindow = createWindow('preload-app.cjs', true)
@@ -185,10 +216,27 @@ function openMain(): void {
   mainWindow.webContents.on('render-process-gone', (_event, details) => { if (!quitting) runtime.report(new Error(`Renderer: ${details.reason}`)) })
   mainWindow.webContents.on('preload-error', (_event, _path, error) => runtime.report(error))
   mainWindow.webContents.on('did-fail-load', (_event, code, message, _url, isMain) => {
-    if (isMain && code !== -3 && !quitting) runtime.report(new Error(message))
+    if (isMain && code !== -3 && !quitting && mainWindow === owner && !owner.isDestroyed()) runtime.report(new Error(message))
   })
-  void mainWindow.loadURL(APP_URL).catch(error => runtime.report(error))
+  void loadMainDocument(owner).catch(error => runtime.report(error))
 }
+/** Cancelled or retired window navigations are not Host failures. */
+async function loadMainDocument(owner: BrowserWindow): Promise<void> {
+  try { await owner.loadURL(APP_URL) } catch (error) {
+    if (quitting || owner.isDestroyed() || mainWindow !== owner) return
+    const failure = error as { code?: string; errno?: number }
+    if (failure?.code === 'ERR_ABORTED' || failure?.errno === -3) return
+    throw error
+  }
+}
+
+async function reloadMain(): Promise<void> {
+  const existing = mainWindow
+  openMain()
+  // A newly created window already started its first navigation in openMain().
+  if (existing && existing === mainWindow && !existing.isDestroyed()) await loadMainDocument(existing)
+}
+
 async function confirmed(message: string, detail = t('将停止当前 Host，正在运行的任务会被中断。', 'This stops the current Host and interrupts running tasks.')): Promise<boolean> {
   const result = await dialog.showMessageBox({ type: 'question', title: 'DSH Desktop Next', message, detail,
     buttons: [t('继续', 'Continue'), t('取消', 'Cancel')], defaultId: 1, cancelId: 1 })
@@ -196,7 +244,7 @@ async function confirmed(message: string, detail = t('将停止当前 Host，正
 }
 async function openPath(path: string): Promise<void> { const error = await shell.openPath(path); if (error) throw new Error(error) }
 
-async function command(value: unknown): Promise<void> {
+async function command(value: unknown, source: 'app' | 'shell' = 'app'): Promise<void> {
   if (!value || typeof value !== 'object' || !('type' in value)) throw new Error('Invalid Next command')
   const input = value as Record<string, unknown>
   const type = input.type
@@ -250,14 +298,18 @@ async function command(value: unknown): Promise<void> {
     }
     if (type === 'reload') {
       if (runtime.recoveryMode || onboarding) { openMain(); return }
-      openMain(); await mainWindow!.loadURL(APP_URL); return
+      await reloadMain(); return
     }
     if (type === 'devtools') { openMain(); (runtime.recoveryMode || onboarding ? shellWindow : mainWindow)!.webContents.toggleDevTools(); return }
+    if (type === 'recovery-action') {
+      await recoveryAction(input)
+      return
+    }
     if (type === 'terminal') {
-      const profileDir = runtime.profiles.directory(runtime.selected)
+      const target = runtime.terminalTarget(source === 'shell')
       openDesktopTerminal({ platform: process.platform, appExecutable: process.execPath, dshBootstrapPath: join(root, 'lib', 'desktop-cli.js'),
-        pnpmBinPath: bundledPnpmEntry(NEXT_PACKAGE), electronVersion: process.versions.electron, profileName: runtime.selected,
-        productVersion: version, profileDir, homeDir: home, stateDir: desktopTerminalStateDirectory(electronData, runtime.selected),
+        pnpmBinPath: bundledPnpmEntry(NEXT_PACKAGE), electronVersion: process.versions.electron, ...target,
+        productVersion: version, stateDir: desktopTerminalStateDirectory(join(target.homeDir, 'electron-user-data'), target.profileName),
         spawn, onLaunchError: error => runtime.report(error) })
       return
     }
@@ -279,7 +331,10 @@ async function command(value: unknown): Promise<void> {
       const result = await dialog.showSaveDialog({ title: type === 'export-ca' ? t('导出局域网 CA 证书', 'Export LAN CA certificate') : t('导出诊断（分享前请检查内容）', 'Export diagnostics (review before sharing)'),
         defaultPath: type === 'export-ca' ? 'dsh-desktop-next-ca.crt' : `dsh-desktop-next-diagnostics-${Date.now()}.json`,
         filters: [{ name: type === 'export-ca' ? 'CA certificate' : 'Diagnostics', extensions: [type === 'export-ca' ? 'crt' : 'json'] }] })
-      if (!result.canceled && result.filePath && !quitting) await writeFile(result.filePath, type === 'export-ca' ? certificate! : runtime.diagnostics.export(state()), { mode: 0o600 })
+      if (!result.canceled && result.filePath && !quitting) {
+        await writeFile(result.filePath, type === 'export-ca' ? certificate! : runtime.diagnostics.export(state()), { mode: 0o600 })
+        if (type === 'diagnostics') diagnosticsFile = result.filePath
+      }
       return
     }
     if (type === 'preferences') {
@@ -289,7 +344,7 @@ async function command(value: unknown): Promise<void> {
           ? t('开启后，同一网络中的设备可通过 HTTPS 访问。登录链接可授予访问权限，请仅与可信设备共享。正在运行的任务会被中断。', 'Devices on your network can connect over HTTPS. Login links grant access; share only with trusted devices. Running tasks will be interrupted.')
           : undefined)) return
         await runtime.restart(() => runtime.writePreferences(preferences))
-        if (mainWindow) await mainWindow.loadURL(APP_URL)
+        if (mainWindow) await loadMainDocument(mainWindow)
       } else {
         if (preferences.browserAccess && preferences.networkExposure === 'lan'
           && (!runtime.preferences.browserAccess || runtime.preferences.networkExposure !== 'lan')
@@ -323,21 +378,121 @@ async function command(value: unknown): Promise<void> {
     }
     // Recovery actions can always bypass first-run setup to repair or inspect a Profile.
     onboarding = false
+    await recoveryStopping
     await runtime.restart(async () => {
       if (type === 'recover') await runtime.profiles.recover(next)
-      if (type === 'rollback') await runtime.recovery.restore(next)
+      if (type === 'rollback') await restoreCheckpoint()
       if (type === 'repair-global') runtime.recovery.repairGlobalPatch()
       if (features) runtime.profiles.setFeatures(next, features)
       if (type === 'safe-mode') runtime.safeMode = true
       else if (type !== 'restart') runtime.safeMode = false
     })
-    openMain()
-    await mainWindow!.loadURL(APP_URL)
+    await reloadMain()
+    if (!runtime.safeMode && mainWindow) shellWindow?.close()
   } catch (error) {
-    if (onboarding && (type === 'onboarding-complete' || type === 'onboarding-skip')) runtime.diagnostics.append(String(error), 'error')
+    if (type === 'recovery-action' || onboarding && (type === 'onboarding-complete' || type === 'onboarding-skip')) runtime.diagnostics.append(String(error), 'error')
     else runtime.report(error)
     throw error
   } finally { runtime.busy = false; native.refresh() }
+}
+
+async function restoreCheckpoint(id?: string): Promise<void> {
+  await runtime.recovery.restore(runtime.selected, id)
+  try { await runRecoveryPlugin(['install']) } catch (error) {
+    throw new Error(t('配置已恢复，但插件依赖安装失败。请检查以下错误并重试恢复：', 'Configuration was restored, but plugin dependencies could not be installed. Check the error and retry recovery:') + '\n' + String(error))
+  }
+  recoveryNotice = { tone: 'success', title: t('检查点已恢复', 'Checkpoint restored'),
+    body: t('配置和所需插件依赖已恢复。请点击“退出并重启”使恢复生效。', 'Configuration and required plugin dependencies have been restored. Choose “Quit and restart” to apply them.') }
+  runtime.diagnostics.append(`Recovered checkpoint ${id} for ${runtime.selected}`)
+}
+
+/** Reconcile dependencies through the same official CLI for recovery install and removal. */
+async function runRecoveryPlugin(args: readonly string[]): Promise<void> {
+  const directory = runtime.profiles.directory(runtime.selected)
+  const runner = recoveryRunner = createPackageRunner({ command: process.execPath, args: [], env: { ELECTRON_RUN_AS_NODE: '1' } }, directory)
+  let output = ''
+  try {
+    const operation = runner.runPlugin(args, directory, AbortSignal.timeout(120_000))
+    const append = (chunk: unknown): void => {
+      output = (output + String(chunk)).slice(-16_384)
+      runtime.diagnostics.hostChunk(String(chunk))
+    }
+    operation.stdout.on('data', append)
+    operation.stderr.on('data', append)
+    const result = await operation.done
+    if (result.exitCode !== 0) throw new Error(maskSecrets(`Plugin ${args[0]} failed (exit ${result.exitCode}): ${output}`))
+  } finally { await runner.dispose(); if (recoveryRunner === runner) recoveryRunner = undefined }
+}
+
+async function recoveryAction(input: Record<string, unknown>): Promise<void> {
+  if (!runtime.recoveryMode && !runtime.safeMode) throw new Error('Open recovery before changing its configuration')
+  const action = input.action
+  recoveryNotice = undefined
+  if (action === 'restart') {
+    if (!await confirmed(t('现在重启 DSH Desktop Next？', 'Restart DSH Desktop Next now?'),
+      t('应用将退出安全模式和恢复助手，重新启动原 Profile。正在运行的任务会中断。', 'The app will leave safe mode and recovery, then restart the original Profile. Running tasks will be interrupted.'))) return
+    relaunch = relaunchArguments(process.argv.slice(1), false, false)
+    app.quit()
+    return
+  }
+  const directory = runtime.profiles.directory(runtime.selected)
+  const files: Record<string, string> = {
+    'open-settings-document': join(home, 'settings.yaml'),
+    'open-profile-patch': join(directory, 'cordis.patch.yml'),
+    'open-profile-manifest': join(directory, 'package.json'),
+  }
+  if (typeof action !== 'string') throw new Error('Invalid recovery action')
+  if (Object.hasOwn(files, action)) { await openPath(files[action]!); return }
+  if (action === 'show-diagnostics') {
+    if (!diagnosticsFile) throw new Error('No exported diagnostics')
+    shell.showItemInFolder(diagnosticsFile); return
+  }
+  if (action === 'open-checkpoint' || action === 'preview-checkpoint') {
+    const checkpoint = runtime.recovery.checkpoints(runtime.selected).find(item => item.id === input.id)
+    if (!checkpoint) throw new Error('Recovery checkpoint is no longer available')
+    if (action === 'open-checkpoint') { await openPath(checkpoint.directory); return }
+    if (!await confirmed(t('还原所选配置备份？', 'Restore the selected configuration backup?'),
+      t(`备份时间：${checkpoint.created}。当前配置会先备份，然后恢复配置并安装所需插件依赖。共享数据不会回滚。`, `Saved: ${checkpoint.created}. Current configuration will be backed up, then the saved configuration and required plugin dependencies will be restored. Shared data is not rolled back.`))) return
+    await recoveryStopping
+    if (!runtime.safeMode) await runtime.backend.stop()
+    await restoreCheckpoint(checkpoint.id)
+    return
+  }
+  if (action === 'preview-uninstall') {
+    const bundle = runtime.recovery.bundles(runtime.selected).find(item => item.bundleId === input.id)
+    if (!bundle || bundle.action !== 'uninstall' || !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u.test(bundle.packageName)) throw new Error('This bundle cannot be uninstalled')
+    if (!await confirmed(t(`卸载插件「${bundle.packageName}」？`, `Uninstall “${bundle.packageName}”?`),
+      t('先备份当前 Profile 配置，然后卸载所选插件。', 'Back up the Profile configuration, then uninstall the selected plugin.'))) return
+    await recoveryStopping
+    if (!runtime.safeMode) await runtime.backend.stop()
+    runtime.recovery.backup(runtime.selected, 'before-plugin-uninstall')
+    await runRecoveryPlugin(['remove', bundle.packageName])
+    return
+  }
+  if (action === 'begin-change-data-directory' || action === 'restore-default-data-directory') {
+    const choice = action === 'begin-change-data-directory' ? await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] }) : undefined
+    if (choice?.canceled) return
+    const target = action === 'restore-default-data-directory' ? defaultHome : choice?.filePaths[0]
+    if (!target || !isAbsolute(target)) return
+    const destination = validateDataDirectory(target, home, defaultHome)
+    if (destination === home) return
+    if (!await confirmed(t('切换数据目录并重启？', 'Change data directory and restart?'),
+      t(`新目录：${destination}。原目录的数据会保留，不会自动迁移。`, `New directory: ${destination}. Existing data remains in its original directory and is not moved.`))) return
+    atomicJson(locationFile, { home: destination })
+    relaunch = relaunchArguments(process.argv.slice(1), false, false)
+    app.quit(); return
+  }
+  if (action === 'factory-reset') {
+    if (!await confirmed(t('重置当前数据目录并重启？', 'Reset the current data directory and restart?'),
+      t('Profile、会话、设置和凭据将移入 recovery 备份目录，应用将重新初始化。', 'Profiles, sessions, settings and credentials will move to a recovery backup. The app will initialize again.'))) return
+    await recoveryStopping
+    await runtime.backend.stop()
+    runtime.diagnostics.flush()
+    runtime.recovery.factoryReset()
+    relaunch = relaunchArguments(process.argv.slice(1), false, false)
+    app.quit(); return
+  }
+  throw new Error('Unknown recovery action')
 }
 
 async function main(): Promise<void> {
@@ -402,7 +557,7 @@ async function main(): Promise<void> {
     window: () => mainWindow, language: () => windowsLanguage, warn: error => runtime.diagnostics.append(String(error), 'warn'),
   })
   ipcMain.handle(IPC.material, event => { assertSender(event, mainWindow, APP_URL); return windowMaterial(runtime.preferences) })
-  ipcMain.handle(IPC.command, (event, value: unknown) => { assertDesktopSender(event); return command(value) })
+  ipcMain.handle(IPC.command, (event, value: unknown) => { assertDesktopSender(event); return command(value, event.sender === shellWindow?.webContents ? 'shell' : 'app') })
   let picking: Promise<string | null> | undefined
   ipcMain.handle(IPC.directory, event => {
     assertSender(event, mainWindow, APP_URL)
@@ -439,6 +594,7 @@ async function main(): Promise<void> {
   runtime.safeMode = process.argv.includes(SAFE_ARGUMENT)
   runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
   runtime.initialize()
+  if (dataLocation.error) { runtime.recoveryMode = true; runtime.report(dataLocation.error) }
   if (!runtime.safeMode && !runtime.recoveryMode) {
     try {
       runtime.profiles.ensure(runtime.selected)
@@ -488,7 +644,7 @@ async function main(): Promise<void> {
   else if (onboarding) openControls('onboarding')
   else { void runtime.start().catch(() => {}); openMain() }
   app.on('activate', openMain)
-  app.on('window-all-closed', () => { if (process.platform !== 'darwin' && !native.available) app.quit() })
+  app.on('window-all-closed', () => { if (process.platform !== 'darwin' && !native.available && !replacingWindow) app.quit() })
 }
 
 app.on('before-quit', event => {
@@ -500,7 +656,7 @@ app.on('before-quit', event => {
     if (window && !window.isDestroyed()) window.hide()
   }
   native.close()
-  void runtime.close().then(() => {
+  void (async () => { await recoveryRunner?.dispose(); await runtime.close() })().then(() => {
     if (relaunch) app.relaunch({ args: relaunch })
     app.quit()
   }, error => { console.error(error); app.exit(1) })
