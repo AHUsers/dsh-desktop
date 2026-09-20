@@ -11,6 +11,7 @@ import { desktopRecoveryCopy } from '../../../dsh-plugin-desktop-beta/src/recove
 import { installDesktopSettingsStyles } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-styles.ts'
 import { NextDesktopActions, NextDesktopSettings, useDesktopState } from '../client/settings.tsx'
 import { NextSettingsAdapter } from '../client/settings-adapter.ts'
+import { installPluginControlsStyles } from '../client/plugin-controls-styles.ts'
 import type { DesktopCommand } from '../desktop-contract.ts'
 import './theme.css'
 
@@ -29,6 +30,7 @@ function NativePages({ adapter }: { adapter: NextSettingsAdapter }) {
   const [busy, setBusy] = useState(false)
   useEffect(() => { const change = () => setPage(location.hash.slice(1)); window.addEventListener('hashchange', change); return () => window.removeEventListener('hashchange', change) }, [])
   useEffect(installDesktopSettingsStyles, [])
+  useEffect(installPluginControlsStyles, [])
   const perform = async (command: DesktopCommand): Promise<void> => {
     if (busy) return
     setFailure(''); setBusy(true)

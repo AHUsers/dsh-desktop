@@ -169,7 +169,7 @@ function useScope<T>(scope: Pick<SettingsScope<T>, 'getSnapshot' | 'subscribe'>)
   return useSyncExternalStore(subscribe, snapshot)
 }
 
-function Choice({
+export function Choice({
   title,
   body,
   aside,

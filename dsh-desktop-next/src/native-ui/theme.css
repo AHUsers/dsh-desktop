@@ -4,13 +4,22 @@
 :root {
   --dsw-alias-label-primary: var(--foreground);
   --dsw-alias-label-secondary: var(--muted-foreground);
+  --dsw-alias-label-tertiary: var(--muted-foreground);
   --dsw-alias-label-primary-foreground: var(--primary-foreground);
   --dsw-alias-bg-base: var(--background);
   --dsw-alias-bg-layer-1: var(--card);
   --dsw-alias-bg-layer-2: var(--muted);
   --dsw-alias-border-l1: var(--border);
   --dsw-alias-border-l2: var(--border);
+  --dsw-alias-border-l3: var(--input);
   --dsw-alias-interactive-bg-hover: var(--muted);
+  --dsw-alias-interactive-bg-active: var(--secondary);
+  --dsw-alias-button-primary-fill: var(--primary);
+  --dsw-alias-button-primary-hover: color-mix(in oklch, var(--primary) 85%, var(--background));
   --dsw-alias-brand-primary: var(--primary);
+  --dsw-alias-bg-mask-1: rgb(0 0 0 / 35%);
+  --dsw-mask-blur: blur(2px);
+  --dsw-elevation-prominent: 0 12px 40px rgb(0 0 0 / 20%);
+  --dsw-alias-state-success-primary: #22a06b;
   --dsw-alias-state-error-primary: var(--destructive);
 }

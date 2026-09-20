@@ -78,7 +78,7 @@ try {
   const packages = ['dsh-community-market', 'dshmarket', '@agents-anywhere/dsh-bridge-next']
   for (const name of packages) {
     const bundle = (await rpc('listBundles')).find(row => row.name === name)
-    assert.equal(bundle?.enabled, true, JSON.stringify(bundle))
+    assert.ok(bundle, JSON.stringify(bundle))
     assert.equal(bundle.optional, true)
     assert.equal(bundle.removable, false)
     const result = await rpc('setBundleEnabled', { name, enabled: false })
@@ -89,10 +89,10 @@ try {
   await rpc('setBundleEnabled', { name: packages[2], enabled: false })
   await stop()
   ;({ origin, cookie } = await boot('default'))
-  assert.deepEqual(manager.features('default'), { market: true, remoteControl: false, dshMarket: true })
+  assert.deepEqual(manager.features('default'), { market: false, remoteControl: false, dshMarket: true })
   assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[2] && row.enabled), false)
   await rpc('setBundleEnabled', { name: packages[2], enabled: true })
-  for (const name of packages) {
+  for (const name of packages.slice(1)) {
     const row = (await rpc('listPlugins')).find(row => row.moduleName === name)
     assert.equal(row?.fiberPhase, 'active', JSON.stringify(row))
     assert.equal(row?.enabled, true, JSON.stringify(row))
@@ -103,6 +103,10 @@ try {
   assert.equal((await rpc('listPlugins')).find(row => row.moduleName === packages[2])?.enabled, false)
   const enabledRow = await rpc('setPluginEnabled', { id: aaRow.entryId, enabled: true })
   assert.equal(enabledRow.application, 'applied', JSON.stringify(enabledRow))
+  const selectedMarket = await rpc('setBundleEnabled', { name: packages[0], enabled: true })
+  assert.equal(selectedMarket.application, 'applied', JSON.stringify(selectedMarket))
+  assert.deepEqual(manager.features('default'), { market: true, remoteControl: true })
+  assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[1] && row.enabled), false)
   const denied = await fetch(`${origin}/api/community-market/state`)
   assert.equal(denied.status, 401)
   const state = await fetch(`${origin}/api/community-market/state`, { headers: { cookie } })
@@ -124,6 +128,8 @@ try {
     return result
   }
   // Probe the real dshmarket update gate without updating or fetching a package.
+  await rpc('setBundleEnabled', { name: packages[1], enabled: true })
+  assert.deepEqual(manager.features('default'), { market: false, remoteControl: true, dshMarket: true })
   for (const originHeader of [undefined, 'dsh-app://app']) {
     const request = new Request('dsh-app://app/dsh-market/update', {
       method: 'POST', body: JSON.stringify({ name: 'fixture-not-installed' }),
@@ -140,6 +146,7 @@ try {
   })
   assert.equal(untrustedUpdate.status, 403)
   await untrustedUpdate.body?.cancel()
+  await rpc('setBundleEnabled', { name: packages[0], enabled: true })
   const builtIn = stateBody.builtIns[0]
   assert.ok(builtIn)
   const added = await call('sources', { action: 'add-builtin', key: builtIn.key })
@@ -175,7 +182,7 @@ try {
   assert.ok(html.includes('dsh-community-market'), 'Market client must appear in the boot manifest')
   assert.ok(html.includes('"id":"dsh-desktop-next"'), 'Next window controls must be a client boot entry')
   assert.ok(html.includes('@agents-anywhere/dsh-bridge-next'), 'AA client must appear in the boot manifest')
-  assert.ok(html.includes('dshmarket'), 'dshmarket client must coexist with Community Market and AA')
+  assert.equal(html.includes('"id":"dshmarket"'), false, 'The other market client must be unloaded')
   const installedAgain = await rpc('installBundle', { spec: fixture })
   assert.equal(installedAgain.application, 'applied', JSON.stringify(installedAgain))
   assert.ok((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin' && row.installed && row.enabled && row.removable))
@@ -243,7 +250,7 @@ try {
     await stop()
     console.log('Opt-in Cua native provider activation and teardown passed without capturing screens, sending input or prompting for OS permissions.')
   }
-  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, both markets and AA independently managed and persisted, official row toggles, dshmarket offline install and cross-market removal, official install/remove with a freshly published locked dependency, native dshmarket update origin gate, graceful shutdown, recovery boot and profile switch.`)
+  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, exclusive market selection and independent AA persisted, official row toggles, dshmarket offline install and cross-market removal, official install/remove with a freshly published locked dependency, native dshmarket update origin gate, graceful shutdown, recovery boot and profile switch.`)
 } finally {
   await runner?.dispose()
   await host?.stop()
