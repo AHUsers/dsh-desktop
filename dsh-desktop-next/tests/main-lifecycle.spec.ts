@@ -52,9 +52,10 @@ vi.mock('electron', async () => {
   class Tray extends EventEmitter {
     destroyed = false
     menu: any
+    tooltip = ''
     constructor() { super(); fixture.trays.push(this) }
     isDestroyed() { return this.destroyed }
-    setToolTip() {}
+    setToolTip(value: string) { this.tooltip = value }
     setContextMenu(menu: any) { this.menu = menu }
     destroy() { this.destroyed = true }
   }
@@ -140,6 +141,7 @@ it('boots directly into recovery without starting a Host or loading the official
     expect(controls.webContents.mainFrame.url).toBe('dsh-app://shell/index.html?lang=zh#recovery')
     const sender = { sender: controls.webContents, senderFrame: controls.webContents.mainFrame }
     expect(fixture.handlers.get('dsh-next:state')!(sender).phase).toBe('recovery')
+    expect(fixture.trays[0].tooltip).toContain('recovery')
     expect(fixture.start).not.toHaveBeenCalled()
     fixture.trays[0].menu[0].click()
     expect(fixture.windows).toHaveLength(1)

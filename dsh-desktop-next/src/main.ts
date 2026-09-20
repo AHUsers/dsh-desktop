@@ -316,6 +316,8 @@ async function main(): Promise<void> {
     native.refresh()
   })
   nativeTheme.on('updated', () => { if (mainWindow && !mainWindow.isDestroyed()) applyWindowMaterial(mainWindow, runtime.preferences) })
+  runtime.safeMode = process.argv.includes(SAFE_ARGUMENT)
+  runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
   runtime.initialize()
   native.createTray()
   Menu.setApplicationMenu(process.platform === 'win32' ? null : Menu.buildFromTemplate([
@@ -351,8 +353,6 @@ async function main(): Promise<void> {
       if (validColor(color) && validColor(symbolColor)) mainWindow!.setTitleBarOverlay({ color, symbolColor })
     })
   }
-  runtime.safeMode = process.argv.includes(SAFE_ARGUMENT)
-  runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
   if (runtime.recoveryMode) openControls('recovery')
   else { void runtime.start().catch(() => {}); openMain() }
   app.on('activate', openMain)
