@@ -168,11 +168,18 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'restart-recovery' })
     expect(fixture.close).not.toHaveBeenCalled()
     let finishClose!: () => void
-    fixture.close.mockImplementationOnce(() => new Promise<void>(resolve => { finishClose = resolve }))
+    fixture.close.mockImplementationOnce(() => {
+      expect(fixture.windows.every(window => !window.visible)).toBe(true)
+      return new Promise<void>(resolve => { finishClose = resolve })
+    })
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'restart-recovery' })
     expect(fixture.close).toHaveBeenCalledOnce()
     expect(app.relaunch).not.toHaveBeenCalled()
     expect(tray.destroyed).toBe(true)
+    window.emit('ready-to-show')
+    controls.emit('ready-to-show')
+    app.emit('activate')
+    expect(fixture.windows.every(window => !window.visible)).toBe(true)
     finishClose()
     await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalledWith({ args: expect.arrayContaining(['--next-recovery']) }))
   } finally { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
@@ -196,6 +203,8 @@ it('boots directly into recovery without starting a Host or loading the official
     fixture.trays[0].menu[0].click()
     expect(fixture.windows).toHaveLength(1)
     expect(fixture.start).not.toHaveBeenCalled()
+    controls.visible = true
+    fixture.close.mockImplementationOnce(async () => { expect(controls.visible).toBe(false) })
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'quit' })
     await vi.waitFor(() => expect(fixture.close).toHaveBeenCalledOnce())
   } finally { process.argv.splice(0, process.argv.length, ...argv); vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }

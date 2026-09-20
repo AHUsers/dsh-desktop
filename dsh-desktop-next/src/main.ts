@@ -87,6 +87,7 @@ function assertDesktopSender(event: Pick<IpcMainInvokeEvent, 'sender' | 'senderF
   else assertSender(event, shellWindow, 'dsh-app://shell/')
 }
 function show(window: BrowserWindow): void {
+  if (quitting || window.isDestroyed()) return
   if (window.isMinimized()) window.restore()
   window.show(); window.focus()
 }
@@ -424,6 +425,10 @@ app.on('before-quit', event => {
   if (quitting || !ownsInstance) return
   event.preventDefault()
   quitting = true
+  // Keep disconnection/reconnection chrome out of the quit/relaunch transition.
+  for (const window of [mainWindow, shellWindow]) {
+    if (window && !window.isDestroyed()) window.hide()
+  }
   native.close()
   void runtime.close().then(() => {
     if (relaunch) app.relaunch({ args: relaunch })
