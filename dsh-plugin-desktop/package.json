@@ -88,7 +88,10 @@
     "README.md",
     "README.zh.md",
     "README.i18n.yaml",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "build/app-icon.icon/**",
+    "build/app-icon.icns",
+    "build/app-icon.resources.json"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -132,7 +135,8 @@
     "dist:win-portable": "node scripts/package-win-portable.ts",
     "prepack": "yarn run check",
     "verify:aa": "node ../scripts/prepare-agents-anywhere-runtime.mjs && DSH_VERIFY_AA=1 node scripts/verify-profile-boot.mjs",
-    "prepare:electron-native": "node scripts/prepare-fs-ext.ts"
+    "prepare:electron-native": "node scripts/prepare-fs-ext.ts",
+    "icons:export": "node ../scripts/export-app-icons.mjs --channel stable"
   },
   "dependencies": {
     "@agents-anywhere/dsh-bridge-next": "file:../vendor/agents-anywhere/agents-anywhere-dsh-bridge-next-0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2.tgz",
@@ -371,7 +375,7 @@
         ]
       },
       "hardenedRuntime": true,
-      "icon": "build/app-icon-mac.png",
+      "icon": "build/app-icon.icon",
       "mergeASARs": false,
       "notarize": true,
       "signIgnore": [
@@ -417,6 +421,9 @@
       "icon": "build/app-icon.png",
       "asar": false
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "dmg": {
+      "icon": "build/app-icon.icns"
+    }
   }
 }

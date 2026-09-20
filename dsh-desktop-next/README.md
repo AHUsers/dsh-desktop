@@ -36,6 +36,12 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 
 Set `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` to use an installed Google Chrome instead. Screenshots are saved under `dsh-desktop-next/.desktop-next/verification/`. Native macOS window movement still needs manual verification. Version-scoped package patches share the official conversation header frame and sidebar controls with the empty homepage and plugin header. The plugin page keeps its original title, toolbar, layout, and scrolling behavior. An invisible 52px drag region belongs to the stable main column and reaches the top and side gutters without taking layout space or painting over content. Buttons, links, inputs, and other interactive controls opt out of native dragging, including when they scroll into this region.
 
+## App icon resources
+
+`build/app-icon.icon` is the editable Icon Composer project with the final NEXT badge layout and System Dark background. On macOS with Xcode 27 and Icon Composer, run `corepack yarn icons:export --channel next` from the repository root to refresh `build/app-icon.png`, the Windows `build/app-icon.ico`, native compiler output `build/app-icon.icns`, and the development Dock image `build/app-icon-mac.png`. Commit these files and `build/app-icon.resources.json` together; `corepack yarn icons:check` verifies them headlessly on any OS.
+
+Next currently has no installer pipeline. Its future macOS packager should consume the layered `.icon` source and compile `Assets.car`, as Stable and Beta do. The raster Dock image is used only during unpackaged development; Windows and Linux windows use their ICO and PNG exports respectively.
+
 ## Usage
 
 Use **Settings → Desktop settings** in the official frontend. A notice at the top links to the **Plugins** page for plugin-market and remote-control settings; it closes Settings and opens Plugins in the same main window. The tray’s **Settings…** entry and `CmdOrCtrl+,` reveal the main window and open the same official Settings dialog; there is no separate settings window. Recovery and Profile tools retain their existing windows. If the Host fails, the settings shortcut opens the recovery assistant. Profile switches and port changes interrupt active tasks while replacing the Host. Browser and LAN access toggles apply immediately without restarting.

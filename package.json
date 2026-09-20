@@ -1180,7 +1180,7 @@
     "check:architecture": "yarn test:architecture-gates && node scripts/verify-market-dependency-direction.mjs",
     "check:vendored-runtime": "node scripts/sync-vendored-runtime.mjs --check --channel stable && node scripts/sync-vendored-runtime.mjs --check --channel beta",
     "check:desktop-variants": "node scripts/verify-desktop-variants.mjs",
-    "check:layout": "yarn test:aa-release && yarn check:bilingual-docs && yarn check:architecture && yarn check:vendored-runtime && yarn check:desktop-variants && node scripts/verify-layout.mjs",
+    "check:layout": "yarn test:aa-release && yarn check:bilingual-docs && yarn check:architecture && yarn check:vendored-runtime && yarn check:desktop-variants && yarn icons:check && node scripts/verify-layout.mjs",
     "check": "yarn check:layout && yarn workspace dsh-community-fabric check && yarn workspace dsh-community-market check && yarn workspace dsh-plugin-desktop check && yarn workspace dsh-plugin-desktop-beta check && yarn workspace dsh-desktop-next check",
     "dev": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dev",
     "start": "yarn workspace dsh-plugin-desktop start",
@@ -1207,6 +1207,8 @@
     "test:aa-release": "node --test scripts/agents-anywhere-release-policy.test.mjs",
     "dev:next": "yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dev",
     "start:next": "yarn workspace dsh-desktop-next start",
-    "check:next": "yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next check"
+    "check:next": "yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next check",
+    "icons:export": "node scripts/export-app-icons.mjs",
+    "icons:check": "node --test scripts/export-app-icons.test.mjs && node scripts/export-app-icons.mjs --check"
   }
 }

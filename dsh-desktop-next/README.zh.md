@@ -36,6 +36,12 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 
 设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。版本限定的包补丁让无会话首页复用官方会话顶栏框架，并让首页和插件页复用官方侧栏控件。插件页保留原有标题、操作栏、布局与滚动行为。在不滚动的主栏顶部设置 52px 高的透明拖动区域，覆盖顶部及两侧留白，不占布局空间、不遮挡内容。按钮、链接、输入框等交互控件排除原生拖动，滚入该区域后仍可点击。
 
+## 应用图标资源
+
+`build/app-icon.icon` 是可编辑的 Icon Composer 工程，保留最终 NEXT 徽标布局和 System Dark 背景。在安装了 Xcode 27 和 Icon Composer 的 Mac 上，从仓库根目录运行 `corepack yarn icons:export --channel next`，可更新 `build/app-icon.png`、Windows 使用的 `build/app-icon.ico`、原生编译生成的 `build/app-icon.icns` 和开发运行的 Dock 图标 `build/app-icon-mac.png`。这些文件需与 `build/app-icon.resources.json` 一起提交；`corepack yarn icons:check` 可在任何系统中无界面验证。
+
+Next 目前尚无安装包流水线。后续 macOS 打包应与 Stable、Beta 一样，直接使用分层 `.icon` 源工程编译 `Assets.car`。PNG Dock 图标仅用于未打包的开发运行；Windows 和 Linux 窗口分别使用 ICO 与 PNG 导出资源。
+
 ## 使用
 
 在官方主界面中打开 **设置 → 桌面设置**。顶部提示插件市场和远程控制设置已移至插件页面；点击“前往插件页面”会关闭设置弹窗，并在同一主窗口打开插件页。托盘的 **设置…** 和 `CmdOrCtrl+,` 会唤起主窗口，打开同一个官方设置弹窗，不再创建独立设置窗口。恢复和 Profile 工具保留现有窗口。Host 启动失败时，设置快捷入口会打开恢复助手。切换 Profile 或更改端口会中断当前任务并重新启动 Host；浏览器和局域网访问开关即时生效，无需重启。

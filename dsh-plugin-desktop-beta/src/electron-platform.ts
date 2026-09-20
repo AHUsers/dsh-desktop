@@ -57,7 +57,8 @@ class MacPlatformStrategy implements ElectronPlatformStrategy {
     productName: string,
     applicationMenuItems: readonly MenuItemConstructorOptions[] = [],
   ): void {
-    app.dock?.setIcon(icon)
+    // Packaged macOS apps use their compiled Icon Composer catalog.
+    if (!app.isPackaged) app.dock?.setIcon(icon)
     this.applicationName = productName
     this.refreshApplicationMenu(applicationMenuItems)
   }
