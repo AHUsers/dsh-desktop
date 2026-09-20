@@ -22,7 +22,7 @@ import { bundledPnpmEntry } from './extensions.ts'
 import { auxiliaryWindowChromeOptions, auxiliaryWindowHasCustomFrame } from '../../dsh-plugin-desktop-beta/src/auxiliary-window-options.ts'
 import { privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
-import { RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
+import { ONBOARDING_ARGUMENT, RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
 import { createNativePermissions, installMediaPermissions } from './electron-permissions.ts'
 import { NativeSidebarBrowser } from './sidebar-browser.ts'
 
@@ -220,6 +220,15 @@ async function command(value: unknown): Promise<void> {
       void runtime.start().catch(() => {})
       openMain()
       shellWindow?.close()
+      return
+    }
+    if (type === 'restart-onboarding') {
+      if (runtime.safeMode || runtime.recoveryMode) throw new Error('Onboarding is unavailable in safe or recovery mode')
+      if (onboarding) { openControls('onboarding'); return }
+      if (!await confirmed(t('重新打开设置向导？', 'Reopen the setup wizard?'),
+        t('应用将重启，并带入当前 Profile 的设置。正在运行的任务会中断。', 'The app will restart with your current Profile settings selected. Running tasks will be interrupted.'))) return
+      relaunch = relaunchArguments(process.argv.slice(1), false, false, true)
+      app.quit()
       return
     }
     if (type === 'restart-app' || type === 'restart-recovery') {
@@ -433,7 +442,7 @@ async function main(): Promise<void> {
   if (!runtime.safeMode && !runtime.recoveryMode) {
     try {
       runtime.profiles.ensure(runtime.selected)
-      onboarding = runtime.profiles.onboardingRequired(runtime.selected)
+      onboarding = process.argv.includes(ONBOARDING_ARGUMENT) || runtime.profiles.onboardingRequired(runtime.selected)
       if (onboarding) onboardingComputerUse = runtime.profiles.computerUseEnabled(runtime.selected)
     } catch (error) {
       onboarding = false

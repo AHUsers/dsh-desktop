@@ -11,8 +11,9 @@ import { installPluginControlsStyles } from '../client/plugin-controls-styles.ts
 import './onboarding.css'
 
 const whaleArtwork = new URL('../../build/app-icon.icon/Assets/DeepSeek.svg?no-inline', import.meta.url).href
-// Reuse the phone artwork from the official AA onboarding instead of a schematic card.
+// Reuse the portable device family artwork and composition from the AA landing page.
 const phoneArtwork = new URL('./assets/agents-anywhere-phone.webp', import.meta.url).href
+const tabletArtwork = new URL('./assets/agents-anywhere-tablet.webp', import.meta.url).href
 type Market = 'none' | 'community' | 'dsh'
 // Keep official dialog dependencies out of recovery and the earlier setup pages.
 const DesktopPermissionsButton = lazy(() => import('../client/permissions.tsx').then(module => ({ default: module.DesktopPermissionsButton })))
@@ -39,7 +40,7 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
   const descriptions = [
     t(`为 Profile「${state.selected}」选好常用功能。\n几步设置，就可以开始。`, `Set up the essentials for Profile “${state.selected}”.\nA few choices, then you’re ready to go.`),
     t('选择一个插件市场，浏览和安装社区插件。\n也可以暂不开启，以后在插件页面调整。', 'Choose a market to browse and install community plugins.\nYou can also leave it off and decide later in Plugins.'),
-    t('通过 Agents Anywhere，在手机或其他电脑上，\n继续与你的 Agent 对话。', 'Use Agents Anywhere on your phone or another computer\nto keep the conversation going.'),
+    t('通过 Agents Anywhere，在手机、平板或其他电脑上，\n继续与你的 Agent 对话。', 'Use Agents Anywhere on your phone, tablet or another computer\nto keep the conversation going.'),
     t('查看屏幕内容，操作鼠标和键盘。\n理解截图需要支持图片输入的模型。', 'View the screen and control the mouse and keyboard.\nUnderstanding screenshots requires a model with image input.'),
     t('恢复助手可以在 Profile 无法启动时打开。\n先检查问题，再选择合适的恢复方式。', 'The recovery assistant works even when a Profile cannot start.\nCheck what happened, then choose how to recover.'),
   ]
@@ -129,8 +130,9 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
               <RadioGroupItem value={option.value} aria-labelledby={`market-${option.value}`} />
             </label>)}
           </RadioGroup>}
-          {page === 2 && <figure className="next-onboarding-phone" aria-hidden="true">
-            <img src={phoneArtwork} width="800" height="1649" alt="" draggable={false} />
+          {page === 2 && <figure className="next-onboarding-devices" aria-hidden="true">
+            <img className="next-onboarding-tablet" src={tabletArtwork} width="1500" height="1067" alt="" draggable={false} />
+            <img className="next-onboarding-phone" src={phoneArtwork} width="720" height="1487" alt="" draggable={false} />
           </figure>}
           {page === 3 && <figure className="next-onboarding-computer" data-enabled={computerUse} aria-hidden="true">
             <div className="next-onboarding-screen">

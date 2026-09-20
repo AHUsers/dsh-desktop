@@ -60,8 +60,10 @@
 .next-onboarding-permissions-loading { display: grid; place-items: center; width: 28px; height: 28px; }
 .next-onboarding-permissions-loading svg { width: 16px; height: 16px; }
 .next-onboarding-option p { color: var(--muted-foreground); font-size: 12px; line-height: 1.85; margin-top: 10px; }
-.next-onboarding-phone { display: flex; justify-content: center; }
-.next-onboarding-phone img { height: min(500px, calc(100svh - 200px)); width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 18px 22px color-mix(in srgb, var(--foreground) 8%, transparent)); }
+.next-onboarding-devices { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); align-items: end; width: 100%; margin: 0; }
+.next-onboarding-devices img { grid-row: 1; width: 100%; height: auto; filter: drop-shadow(0 18px 22px color-mix(in srgb, var(--foreground) 8%, transparent)); }
+.next-onboarding-tablet { grid-column: 4 / 21; }
+.next-onboarding-phone { grid-column: 1 / 7; z-index: 1; transform: translateY(6%); }
 .next-onboarding-computer { width: 100%; max-width: 380px; margin: auto; }
 .next-onboarding-screen { position: relative; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--card); box-shadow: 0 18px 50px color-mix(in srgb, var(--foreground) 5%, transparent); }
 .next-onboarding-screen-toolbar { display: flex; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
