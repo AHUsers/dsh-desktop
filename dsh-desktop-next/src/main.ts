@@ -22,6 +22,7 @@ import { bundledPnpmEntry } from './extensions.ts'
 import { DESKTOP_CONTROLS_CSS } from './controls/styles.ts'
 import { privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
+import { RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
 
 const root = dirname(NEXT_PACKAGE)
 const home = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
@@ -36,6 +37,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'dsh-app', privileges: {
 let mainWindow: BrowserWindow | undefined
 let shellWindow: BrowserWindow | undefined
 let quitting = false
+let relaunch: string[] | undefined
 let ownsInstance = false
 let windowsLanguage = 'en'
 const require = createRequire(NEXT_PACKAGE)
@@ -114,9 +116,9 @@ function createWindow(preload: string, primary = false): BrowserWindow {
   return window
 }
 
-function openControls(page: 'general' | 'profiles' | 'recovery' = 'general'): void {
+function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' = 'general'): void {
   if (quitting) return
-  const url = `${SHELL_URL}#${page}`
+  const url = `${SHELL_URL}?lang=${windowsLanguage.startsWith('zh') ? 'zh' : 'en'}#${page}`
   if (shellWindow && !shellWindow.isDestroyed()) {
     void shellWindow.loadURL(url).catch(error => runtime.diagnostics.append(String(error), 'error'))
     show(shellWindow); return
@@ -128,6 +130,7 @@ function openControls(page: 'general' | 'profiles' | 'recovery' = 'general'): vo
 }
 function openMain(): void {
   if (quitting) return
+  if (runtime.recoveryMode) { openControls('recovery'); return }
   if (mainWindow && !mainWindow.isDestroyed()) { show(mainWindow); return }
   mainWindow = createWindow('preload-app.cjs', true)
   mainWindow.on('closed', () => { mainWindow = undefined })
@@ -150,13 +153,23 @@ async function command(value: unknown): Promise<void> {
   const input = value as Record<string, unknown>
   const type = input.type
   if (type === 'controls') {
-    if (input.page !== undefined && input.page !== 'general' && input.page !== 'profiles' && input.page !== 'recovery') throw new Error('Invalid controls page')
-    openControls(input.page); return
+    if (input.page !== undefined && !['general', 'profiles', 'create-profile', 'tools', 'recovery'].includes(String(input.page))) throw new Error('Invalid controls page')
+    openControls(input.page as Parameters<typeof openControls>[0]); return
   }
   if (type === 'quit') { app.quit(); return }
   if (runtime.busy || quitting) throw new Error(t('另一项操作正在进行，请稍候。', 'Another operation is in progress.'))
   runtime.busy = true; native.refresh()
   try {
+    if (type === 'restart-app' || type === 'restart-recovery') {
+      if (!await confirmed(type === 'restart-recovery'
+        ? t('重启应用并进入恢复模式？', 'Restart the application in recovery mode?')
+        : t('现在重启 DSH Desktop Next？', 'Restart DSH Desktop Next now?'), type === 'restart-recovery'
+        ? t('应用将先打开恢复助手，暂不加载当前 Profile 和插件。正在运行的任务会中断。', 'The recovery assistant will open before loading the current Profile and plugins. Running tasks will be interrupted.')
+        : undefined)) return
+      relaunch = relaunchArguments(process.argv.slice(1), type === 'restart-recovery', runtime.safeMode)
+      app.quit()
+      return
+    }
     if (type === 'create') { runtime.profiles.create(profileName(input.name)); return }
     if (type === 'delete') {
       const name = profileName(input.name)
@@ -164,8 +177,8 @@ async function command(value: unknown): Promise<void> {
       if (await confirmed(t(`移除 Profile「${name}」？`, `Remove Profile “${name}”?`), t('其文件将移入恢复备份目录。共享的会话和设置会保留。', 'Its files move to recovery backups. Shared sessions and settings are retained.'))) runtime.recovery.removeProfile(name, runtime.selected)
       return
     }
-    if (type === 'reload') { openMain(); await mainWindow!.loadURL(APP_URL); return }
-    if (type === 'devtools') { openMain(); mainWindow!.webContents.openDevTools({ mode: 'detach' }); return }
+    if (type === 'reload') { if (runtime.recoveryMode) return; openMain(); await mainWindow!.loadURL(APP_URL); return }
+    if (type === 'devtools') { openMain(); (runtime.recoveryMode ? shellWindow : mainWindow)!.webContents.toggleDevTools(); return }
     if (type === 'terminal') {
       const profileDir = runtime.profiles.directory(runtime.selected)
       openDesktopTerminal({ platform: process.platform, appExecutable: process.execPath, dshBootstrapPath: join(root, 'lib', 'desktop-cli.js'),
@@ -203,7 +216,8 @@ async function command(value: unknown): Promise<void> {
     }
     if (!['switch', 'features', 'restart', 'recover', 'safe-mode', 'normal-mode', 'rollback', 'repair-global'].includes(String(type))) throw new Error('Invalid Next command')
     const next = type === 'switch' ? profileName(input.name) : runtime.selected
-    if (type === 'switch' && !runtime.profiles.list().includes(next)) throw new Error('Profile does not exist')
+    if (type === 'switch' && next === runtime.selected && !runtime.safeMode && !runtime.recoveryMode && runtime.backend.state.phase === 'ready') return
+    if (type === 'switch' && !runtime.profiles.selectable(next)) throw new Error('Profile is unavailable for Desktop Next')
     const features = type === 'features' ? parseFeatures(input.features) : undefined
     if (type === 'rollback' && !runtime.recovery.latest(next)) throw new Error(t('尚无成功启动的配置备份。', 'No successful-start configuration is available.'))
     const messages: Record<string, string> = {
@@ -288,6 +302,12 @@ async function main(): Promise<void> {
     try { assertSender(event, mainWindow, APP_URL) } catch { return }
     if (source === 'light' || source === 'dark' || source === 'system') nativeTheme.themeSource = source
   })
+  ipcMain.on(IPC.locale, (event, language: unknown) => {
+    try { assertSender(event, mainWindow, APP_URL) } catch { return }
+    if (typeof language !== 'string' || !/^[a-zA-Z]+(?:-[a-zA-Z0-9]+)*$/u.test(language) || language === windowsLanguage) return
+    windowsLanguage = language
+    native.refresh()
+  })
   nativeTheme.on('updated', () => { if (mainWindow && !mainWindow.isDestroyed()) applyWindowMaterial(mainWindow, runtime.preferences) })
   runtime.initialize()
   native.createTray()
@@ -324,8 +344,10 @@ async function main(): Promise<void> {
       if (validColor(color) && validColor(symbolColor)) mainWindow!.setTitleBarOverlay({ color, symbolColor })
     })
   }
-  void runtime.start().catch(() => {})
-  openMain()
+  runtime.safeMode = process.argv.includes(SAFE_ARGUMENT)
+  runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
+  if (runtime.recoveryMode) openControls('recovery')
+  else { void runtime.start().catch(() => {}); openMain() }
   app.on('activate', openMain)
   app.on('window-all-closed', () => { if (process.platform !== 'darwin' && !native.available) app.quit() })
 }
@@ -335,7 +357,10 @@ app.on('before-quit', event => {
   event.preventDefault()
   quitting = true
   native.close()
-  void runtime.close().then(() => app.quit(), error => { console.error(error); app.exit(1) })
+  void runtime.close().then(() => {
+    if (relaunch) app.relaunch({ args: relaunch })
+    app.quit()
+  }, error => { console.error(error); app.exit(1) })
 })
 ownsInstance = claimDesktopSingleInstance(app, openMain)
 if (ownsInstance) void main().catch(error => runtime.report(error))

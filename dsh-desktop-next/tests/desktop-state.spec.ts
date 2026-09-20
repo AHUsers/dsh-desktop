@@ -85,7 +85,7 @@ it('exports only bounded redacted diagnostics, including secrets split across ch
   log.hostChunk('Authorization: Bear')
   log.hostChunk('er private-token\nCookie: secret-cookie\n')
   log.append('debug information', 'debug')
-  const data = log.export({ version: 'next-dev', platform: 'test', selected: 'default', profiles: [], phase: 'error',
+  const data = log.export({ version: 'next-dev', platform: 'test', selected: 'default', profiles: [], unavailableProfiles: [], phase: 'error',
     safeMode: false, failure: 'token=private-token', features: { market: false, remoteControl: false }, preferences: { ...DEFAULT_PREFERENCES },
     trayAvailable: true, browserUrl: null, lan: null, busy: false, home, notificationsAvailable: true, windowsMicaSupported: false, checkpoint: null, logs: '' } satisfies DesktopState)
   expect(data).not.toContain('private-token')

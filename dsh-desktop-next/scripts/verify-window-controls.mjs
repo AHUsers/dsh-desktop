@@ -42,7 +42,7 @@ try {
   await context.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])
   const controlCommands = []
   const controlState = {
-    selected: 'default', profiles: ['default', 'work'], features: { market: false, remoteControl: false },
+    selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
     preferences: { closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off', browserAccess: false,
       networkExposure: 'loopback', port: 0, lanPort: 0, logLevel: 'info', notifications: true,
       turnCompleted: true, turnFailed: true, jobCompleted: true, jobFailed: true },
@@ -55,6 +55,8 @@ try {
     controlCommands.push(command)
     if (command.type === 'preferences') controlState.preferences = command.preferences
     if (command.type === 'switch') controlState.selected = command.name
+    if (command.type === 'features') controlState.features = command.features
+    if (command.type === 'create') controlState.profiles.push(command.name)
   })
   await context.addInitScript(() => {
     window.desktopNext = { state: () => window.__nextTestState(), command: command => window.__nextTestCommand(command) }
@@ -154,25 +156,50 @@ try {
   }
   await page.evaluate(() => { document.documentElement.dataset.platform = 'darwin' })
   await page.getByRole('button', { name: /^(设置|Settings)$/ }).click()
+  // Native shortcuts appear on every official Settings section, like the original Desktop.
+  const actions = page.locator('[data-next-settings-actions]')
+  await actions.getByRole('button', { name: /^(打开终端|Open Terminal)$/ }).click()
+  assert.equal(controlCommands.at(-1).type, 'terminal')
+  const restartOptions = actions.getByRole('button', { name: /^(重启应用|Restart App)$/ })
+  await restartOptions.click()
+  await actions.getByRole('menu').press('Escape')
+  assert.equal(await actions.getByRole('menu').count(), 0)
+  assert.equal(await restartOptions.evaluate(element => element === document.activeElement), true)
+  await restartOptions.press('ArrowDown')
+  await actions.getByRole('menuitem', { name: /^(重启到恢复模式|Restart in Recovery Mode)$/ }).click()
+  assert.equal(controlCommands.at(-1).type, 'restart-recovery')
   await page.getByRole('button', { name: /^(桌面|Desktop)$/ }).click()
   const settings = page.locator('[data-next-desktop-settings]')
   await settings.getByRole('heading', { name: /^(桌面设置|Desktop settings)$/ }).waitFor()
+  assert.equal(await settings.locator('nav').isVisible(), false, 'The Desktop page uses grouped settings instead of nested navigation')
+  assert.equal(await settings.locator('[data-command="switch"][data-name="broken"]').isDisabled(), true)
   const closeToTray = settings.locator('[data-preference="closeToTray"]')
   assert.equal(await closeToTray.isChecked(), true)
   await closeToTray.uncheck()
-  // Status polling must not overwrite unsaved preferences.
+  await page.waitForFunction(() => !document.querySelector('[data-next-desktop-settings] [data-preference="closeToTray"]').disabled)
+  assert.ok(controlCommands.some(command => command.type === 'preferences' && !command.preferences.closeToTray), 'Desktop toggles save immediately')
+  await settings.getByText(/^(端口设置|Port settings)$/).click()
+  const port = settings.locator('[data-preference="port"]')
+  await port.fill('23456')
   await settings.locator('[data-refresh]').click()
-  assert.equal(await closeToTray.isChecked(), false)
-  await settings.getByRole('button', { name: /^(保存桌面设置|Save desktop settings)$/ }).click()
-  await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-preference="closeToTray"]').checked === false)
-  assert.ok(controlCommands.some(command => command.type === 'preferences' && !command.preferences.closeToTray))
+  assert.equal(await port.inputValue(), '23456', 'Polling preserves a port draft')
+  const notifications = settings.locator('[data-preference="notifications"]')
+  await notifications.uncheck()
+  await page.waitForFunction(() => !document.querySelector('[data-next-desktop-settings] [data-preference="notifications"]').disabled)
+  assert.equal(await settings.locator('[data-preference="turnCompleted"]').isDisabled(), true)
+  assert.equal(await port.inputValue(), '23456', 'Saving an independent toggle preserves the port draft')
+  await settings.getByRole('button', { name: /^(保存端口|Save ports)$/ }).click()
+  await page.waitForFunction(() => !document.querySelector('[data-next-desktop-settings] [data-preference="port"]').disabled)
+  assert.ok(controlCommands.some(command => command.type === 'preferences' && command.preferences.port === 23456 && !command.preferences.notifications))
+  await settings.locator('[data-feature="market"][data-value="true"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-feature="market"][data-value="true"]').getAttribute('aria-checked') === 'true')
+  assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
   await settings.getByRole('heading', { name: /^(桌面设置|Desktop settings)$/ }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-settings.png'), animations: 'disabled' })
-  await settings.locator('[data-tab="profiles"]').click()
-  await settings.locator('[data-profiles]').selectOption('work')
-  await settings.locator('[data-command="switch"]').click()
+  await settings.locator('[data-command="switch"][data-name="work"]').click()
   await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-status]').textContent.startsWith('work'))
   assert.deepEqual(controlCommands.at(-1), { type: 'switch', name: 'work' })
+  assert.equal(await settings.locator('[data-command="switch"][data-name="work"]').isDisabled(), true)
 
   // Serve the exact independent recovery artifact with no Host or client boot.
   const recoveryPage = await context.newPage()
@@ -192,9 +219,16 @@ try {
   assert.equal(await recoveryPage.locator('[data-failure] script').count(), 0)
   await recoveryPage.locator('[data-command="safe-mode"]').click()
   assert.equal(controlCommands.at(-1).type, 'safe-mode')
-  assert.equal(await recoveryPage.locator('[data-command="normal-mode"]').isDisabled(), true)
+  assert.equal(await recoveryPage.locator('[data-command="normal-mode"]').isVisible(), false)
   await recoveryPage.screenshot({ path: join(screenshots, 'recovery-assistant.png'), animations: 'disabled', fullPage: true })
   assert.deepEqual(recoveryErrors, [])
+  await recoveryPage.goto('http://next-recovery.test/#create-profile')
+  await recoveryPage.locator('[data-page="profiles"]').waitFor({ state: 'visible' })
+  assert.equal(await recoveryPage.locator('[name="profile"]').evaluate(element => element === document.activeElement), true)
+  await recoveryPage.locator('[name="profile"]').fill('from-tray')
+  await recoveryPage.getByRole('button', { name: /^(创建并切换|Create and switch)$/ }).click()
+  await recoveryPage.waitForFunction(() => document.querySelector('[data-status]').textContent.startsWith('from-tray'))
+  assert.deepEqual(controlCommands.slice(-2), [{ type: 'create', name: 'from-tray' }, { type: 'switch', name: 'from-tray' }])
   await recoveryPage.close()
   controlState.safeMode = true
   await page.reload()
@@ -204,7 +238,7 @@ try {
   assert.deepEqual(controlCommands.at(-1), { type: 'controls', page: 'recovery' })
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
-  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Desktop Settings registration, unsaved preference preservation, Profile actions, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
+  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, draft preservation, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
   console.log(`Screenshots: ${screenshots}`)
 } catch (error) {
   if (page && !page.isClosed()) {

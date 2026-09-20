@@ -50,8 +50,17 @@ export class NextProfiles {
     return profileName((JSON.parse(text) as { active?: unknown }).active)
   }
   select(name: string): void {
-    if (!existsSync(join(this.directory(name), 'package.json'))) throw new Error('Profile does not exist')
+    if (!this.selectable(name)) throw new Error('Profile is unavailable for Desktop Next')
     atomicJson(join(this.home, 'desktop-next.json'), { version: 1, active: name })
+  }
+  /** Read configuration only; never load plugins just to render the native selector. */
+  selectable(name: string): boolean {
+    try {
+      const value = JSON.parse(readPrivateFile(join(this.directory(name), 'package.json')) ?? 'null') as { dsh?: { profile?: { bundles?: unknown } } } | null
+      const bundles = value?.dsh?.profile?.bundles
+      this.features(name)
+      return Array.isArray(bundles) && bundles.every(item => typeof item === 'string') && bundles.includes('dsh-desktop-next')
+    } catch { return false }
   }
   list(): string[] {
     const root = join(this.home, 'profiles')

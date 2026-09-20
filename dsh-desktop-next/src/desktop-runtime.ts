@@ -37,6 +37,7 @@ export class NextDesktopRuntime {
   preferences: DesktopPreferences = { ...DEFAULT_PREFERENCES }
   selected = 'default'
   safeMode = false
+  recoveryMode = false
   busy = false
   closing = false
   failure = ''
@@ -72,6 +73,7 @@ export class NextDesktopRuntime {
   }
 
   start(): Promise<void> {
+    this.recoveryMode = false
     this.failure = ''
     this.startup = this.backend.start(async () => {
       if (this.safeMode && !this.safeHome) {
@@ -102,7 +104,7 @@ export class NextDesktopRuntime {
     this.options.onChange()
   }
 
-  state(): Pick<DesktopState, 'selected' | 'profiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
+  state(): Pick<DesktopState, 'selected' | 'profiles' | 'unavailableProfiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
     let features = { ...DEFAULT_FEATURES }
     let profiles: string[] = []
     let checkpoint: DesktopState['checkpoint'] = null
@@ -110,7 +112,7 @@ export class NextDesktopRuntime {
     try { profiles = this.profiles.list() } catch (error) { failure ||= maskSecrets(String(error)) }
     try { features = this.profiles.features(this.selected) } catch (error) { failure ||= maskSecrets(String(error)) }
     try { const saved = this.recovery.latest(this.selected); if (saved) checkpoint = { created: saved.created } } catch { /* Recovery remains usable without backups. */ }
-    return { selected: this.selected, profiles, features, preferences: { ...this.preferences }, phase: !this.auth && failure ? 'error' : this.backend.state.phase,
+    return { selected: this.selected, profiles, unavailableProfiles: profiles.filter(name => !this.profiles.selectable(name)), features, preferences: { ...this.preferences }, phase: this.recoveryMode ? 'recovery' : !this.auth && failure ? 'error' : this.backend.state.phase,
       busy: this.busy, failure, safeMode: this.safeMode, home: this.options.home,
       browserUrl: this.auth && this.preferences.browserAccess && !this.safeMode ? new URL(this.auth.url).origin : null,
       lan: this.lan?.snapshot() ?? null, checkpoint, logs: this.diagnostics.snapshot() }
