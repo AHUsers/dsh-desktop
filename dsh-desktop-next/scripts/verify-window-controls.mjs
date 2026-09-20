@@ -55,7 +55,13 @@ try {
   await context.exposeFunction('__nextTestCommand', command => {
     if (command.type === 'preferences' && rejectPreference) { rejectPreference = false; throw new Error('Fixture: preference save rejected') }
     controlCommands.push(command)
-    if (command.type === 'preferences') controlState.preferences = command.preferences
+    if (command.type === 'preferences') {
+      controlState.preferences = command.preferences
+      controlState.browserUrl = command.preferences.browserAccess ? streamBaseUrl + '/' : null
+      controlState.lan = command.preferences.networkExposure === 'lan'
+        ? { state: 'ready', actualPort: 43121, addresses: ['192.168.1.20'], caFingerprint: 'a'.repeat(64), errorCode: null }
+        : null
+    }
     if (command.type === 'switch') controlState.selected = command.name
     if (command.type === 'features') controlState.features = command.features
     if (command.type === 'create') controlState.profiles.push(command.name)
@@ -182,16 +188,13 @@ try {
   await closeToTray.click()
   await page.waitForFunction(() => !document.querySelector('.dshDesktopSettingsGroup:last-child button')?.disabled)
   assert.ok(controlCommands.some(command => command.type === 'preferences' && !command.preferences.closeToTray))
-  const port = settings.getByRole('spinbutton', { name: /^(本机端口|Local port)$/ })
-  await port.fill('23456')
+  assert.equal(await settings.getByRole('heading', { name: /^(端口设置|Port settings)$/ }).count(), 0)
+  assert.equal(await settings.getByRole('spinbutton').count(), 0)
   const notifications = settings.getByRole('switch', { name: /启用桌面通知|Enable Desktop notifications/ })
   await notifications.click()
   await page.waitForFunction(() => document.querySelector('[aria-labelledby="dsh-desktop-notifications-title"] [role="switch"]')?.getAttribute('aria-checked') === 'false')
   assert.equal(await settings.getByRole('switch', { name: /本轮任务完成|Current turn completed/ }).isDisabled(), true)
-  assert.equal(await port.inputValue(), '23456')
-  await settings.getByRole('button', { name: /^(保存端口|Save ports)$/ }).click()
-  await port.waitFor({ state: 'visible' })
-  assert.ok(controlCommands.some(command => command.type === 'preferences' && command.preferences.port === 23456 && !command.preferences.notifications))
+  assert.ok(controlCommands.some(command => command.type === 'preferences' && !command.preferences.notifications && !command.preferences.closeToTray))
   rejectPreference = true
   await closeToTray.click()
   await settings.getByText('Fixture: preference save rejected').waitFor()
@@ -206,10 +209,35 @@ try {
   await settings.getByRole('radio', { name: /dsh-community-market/ }).click()
   await page.waitForFunction(() => [...document.querySelectorAll('[role="radio"]')].some(el => /dsh-community-market/.test(el.textContent) && el.getAttribute('aria-checked') === 'true'))
   assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
+  // Browser actions live beside the access addresses, with availability following the toggles.
+  const webSettings = settings.locator('section[aria-labelledby="dsh-desktop-web-title"]')
+  const browserAccess = webSettings.getByRole('switch', { name: /允许在浏览器中打开|Allow opening this Profile in a browser/ })
+  const lanAccess = webSettings.getByRole('switch', { name: /局域网访问|Local-network access/ })
+  const copyBrowser = webSettings.getByRole('button', { name: /复制本机登录链接|Copy local login link/ })
+  const copyLan = webSettings.getByRole('button', { name: /复制局域网登录链接|Copy LAN login link/ })
+  const exportCa = webSettings.getByRole('button', { name: /导出 CA 证书|Export CA certificate/ })
+  assert.equal(await copyBrowser.count(), 0)
+  await browserAccess.click()
+  await copyBrowser.click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'copy-browser' })
+  assert.equal(await copyLan.count(), 0)
+  assert.equal(await exportCa.count(), 0)
+  await lanAccess.click()
+  await copyLan.click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'copy-lan' })
+  await exportCa.click()
+  assert.deepEqual(controlCommands.at(-1), { type: 'export-ca' })
+  assert.equal(await settings.getByRole('button', { name: /复制本机登录链接|Copy local login link/ }).count(), 1)
   await settings.getByRole('heading').first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-settings.png'), animations: 'disabled' })
-  await settings.locator('#dsh-desktop-web-title').scrollIntoViewIfNeeded()
+  await webSettings.evaluate(element => element.scrollIntoView({ block: 'start' }))
   await page.screenshot({ path: join(screenshots, 'desktop-access-settings.png'), animations: 'disabled' })
+  await lanAccess.click()
+  await copyLan.waitFor({ state: 'hidden' })
+  assert.equal(await exportCa.count(), 0)
+  assert.equal(await copyBrowser.isVisible(), true)
+  await browserAccess.click()
+  await copyBrowser.waitFor({ state: 'hidden' })
   await settings.locator('#dsh-desktop-notifications-title').scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-notification-settings.png'), animations: 'disabled' })
   await settings.getByRole('radio', { name: /^work/ }).click()
@@ -271,7 +299,7 @@ try {
   await webContext.close()
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
-  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, draft preservation, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
+  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, browser actions beside access addresses, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
   console.log(`Screenshots: ${screenshots}`)
 } catch (error) {
   if (recoveryPage && !recoveryPage.isClosed()) {

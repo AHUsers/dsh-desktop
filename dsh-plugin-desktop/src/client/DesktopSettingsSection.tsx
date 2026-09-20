@@ -52,6 +52,7 @@ export interface DesktopSettingsSectionInjected {
     readonly materialRequiresRestart?: boolean
     readonly nativeLanConfirmation?: boolean
   }
+  readonly browserActions?: ReactNode
   readonly extraSections?: ReactNode
 }
 
@@ -318,6 +319,7 @@ export function DesktopSettingsSection({
   desktopSettings,
   notificationSettings,
   capabilities,
+  browserActions,
   extraSections,
 }: DesktopSettingsSectionInjected & Pick<PropsLocale<'desktop.settings'>, 't'>) {
   const desktop = useScope(desktopSettings)
@@ -777,6 +779,7 @@ export function DesktopSettingsSection({
             {view.web.lanUrls.map(url => <a href={url} onClick={event => openBrowser(event, url)} key={url} target="_blank" rel="noopener noreferrer">{url}</a>)}
           </div>
         )}
+        {browserActions}
         {networkExposure === 'lan' && view !== undefined && (
           <>
             <p className="dshDesktopSettingsNotice">{t('lanTrustNotice')}</p>

@@ -37,6 +37,7 @@ export function NextDesktopSettings({ adapter, language }: { adapter: NextSettin
     setMode={async () => { throw new Error('Window modes are not supported in Next') }}
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
     capabilities={{ windowModes: false, featuresReadOnly: state?.safeMode ?? true, markets: ['disabled', 'community-market'], materialRequiresRestart: false, nativeLanConfirmation: true }}
+    browserActions={state && <NextBrowserActions adapter={adapter} state={state} language={language} />}
     extraSections={state && <NextDesktopOptions adapter={adapter} state={state} language={language} />}
   /></div>
 }
@@ -46,12 +47,29 @@ export function NextDesktopActions({ adapter, language }: { adapter: NextSetting
   return <DesktopNativeActions api={adapter.api} t={desktopTranslate(language)} placement="settings" terminalAvailable={state?.platform === 'darwin' || state?.platform === 'win32'} />
 }
 
+function NextBrowserActions({ adapter, state, language }: { adapter: NextSettingsAdapter; state: DesktopState; language: string }) {
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+  const run = async (type: 'copy-browser' | 'copy-lan' | 'export-ca'): Promise<void> => {
+    setBusy(true); setFailure('')
+    try { await adapter.command({ type }) } catch (error) { setFailure(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+  }
+  const action = (type: Parameters<typeof run>[0], cn: string, en: string) => <button key={type} type="button" className="dshDesktopSettingsButton dshDesktopSettingsButtonSecondary" disabled={busy || state.busy} onClick={() => { void run(type) }}>{language.startsWith('zh') ? cn : en}</button>
+  if (!state.browserUrl) return null
+  return <>
+    {failure && <p role="alert" className="dshDesktopSettingsError">{failure}</p>}
+    <div className="dshDesktopSettingsDialogActions">
+      {action('copy-browser', '复制本机登录链接', 'Copy local login link')}
+      {state.lan?.state === 'ready' && <>{action('copy-lan', '复制局域网登录链接', 'Copy LAN login link')}{action('export-ca', '导出 CA 证书', 'Export CA certificate')}</>}
+    </div>
+  </>
+}
+
 /** Next-only preferences use the existing Desktop form and switch components. */
 function NextDesktopOptions({ adapter, state, language }: { adapter: NextSettingsAdapter; state: DesktopState; language: string }) {
   const t = (cn: string, en: string): string => language.startsWith('zh') ? cn : en
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
-  const [ports, setPorts] = useState<{ port: number; lanPort: number }>()
   const run = async (operation: () => Promise<void>): Promise<void> => {
     setBusy(true); setFailure('')
     try { await operation() } catch (error) { setFailure(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
@@ -63,15 +81,8 @@ function NextDesktopOptions({ adapter, state, language }: { adapter: NextSetting
       <DesktopSettingsToggleRow label={t('关闭窗口后保持后台运行', 'Keep running after closing the window')} checked={state.preferences.closeToTray} disabled={busy || state.busy} onChange={closeToTray => { void run(() => adapter.savePreferences({ closeToTray })) }} />
       <p className="dshDesktopSettingsHint">{state.trayAvailable ? t('可从托盘重新打开窗口。', 'Reopen the window from the tray.') : t('系统托盘不可用，关闭主窗口将退出应用。', 'The tray is unavailable; closing the main window quits the application.')}</p>
     </section>
-    <section className="dshDesktopSettingsGroup"><h3>{t('端口设置', 'Port settings')}</h3>
-      <form className="dshDesktopSettingsForm" onSubmit={event => { event.preventDefault(); void run(async () => { await adapter.savePreferences(ports ?? state.preferences); setPorts(undefined) }) }}>
-        {(['port', 'lanPort'] as const).map(key => <label key={key} className="dshDesktopSettingsField">{key === 'port' ? t('本机端口', 'Local port') : t('局域网 HTTPS 端口', 'LAN HTTPS port')}<input className="dshDesktopSettingsInput" type="number" min="0" max="65535" required value={(ports ?? state.preferences)[key]} disabled={busy || state.busy || state.safeMode} onChange={event => { setPorts({ port: state.preferences.port, lanPort: state.preferences.lanPort, ...ports, [key]: Number(event.currentTarget.value) }) }} /></label>)}
-        <button className="dshDesktopSettingsButton" disabled={busy || state.busy || state.safeMode}>{t('保存端口', 'Save ports')}</button>
-      </form><p className="dshDesktopSettingsHint">{t('0 表示自动分配。更改端口需要重启后台服务。', 'Use 0 for an automatic port. Port changes restart the background service.')}</p>
-    </section>
     <section className="dshDesktopSettingsGroup"><h3>{t('桌面工具', 'Desktop tools')}</h3>
       <div className="dshDesktopSettingsDialogActions">{action('open-home', '打开数据目录', 'Open data directory')}{action('open-profile', '打开 Profile 目录', 'Open Profile directory')}{action('open-logs', '打开日志目录', 'Open log directory')}{action('devtools', '开发者工具', 'Developer Tools')}</div>
-      {state.browserUrl && <div className="dshDesktopSettingsDialogActions">{action('copy-browser', '复制本机登录链接', 'Copy local login link')}{state.lan?.state === 'ready' && <>{action('copy-lan', '复制局域网登录链接', 'Copy LAN login link')}{action('export-ca', '导出 CA 证书', 'Export CA certificate')}</>}</div>}
       <label className="dshDesktopSettingsMaterialField">{t('日志级别', 'Log level')}<select className="dshDesktopSettingsSelect" value={state.preferences.logLevel} disabled={busy || state.busy} onChange={event => { const logLevel = event.currentTarget.value as DesktopState['preferences']['logLevel']; void run(() => adapter.savePreferences({ logLevel })) }}>{['debug', 'info', 'warn', 'error'].map(value => <option key={value}>{value}</option>)}</select></label>
       <button type="button" className="dshDesktopSettingsButton" onClick={() => { void run(() => adapter.command({ type: 'controls', page: 'recovery' })) }}>{t('打开恢复助手', 'Open recovery assistant')}</button>
     </section>
