@@ -186,6 +186,8 @@ try {
   await checkDrag()
   await collapse.click()
   await reopen.waitFor({ state: 'visible' })
+  assert.equal(await page.locator('[data-sidebar-header-controls] button').count(), 2,
+    'Conversation headers keep both official sidebar and new-session controls')
   mkdirSync(screenshots, { recursive: true })
   await page.screenshot({ path: join(screenshots, 'new-session-collapsed.png'), animations: 'disabled' })
   // A tray/shortcut request activates the official Settings trigger even with the sidebar collapsed.
@@ -322,6 +324,22 @@ try {
   await refresh.click()
   const pluginPanel = page.locator('[data-plugin-panel]')
   const pluginHeader = page.locator('[data-plugin-page-header="list"]')
+  const checkPluginReopen = async () => {
+    await reopen.waitFor({ state: 'visible' })
+    await page.waitForFunction(() => Number.parseFloat(getComputedStyle(document.querySelector('[data-shell-overlay]').parentElement).gridTemplateColumns) === 0)
+    assert.equal(await page.locator('[data-sidebar-header-controls] button').count(), 1,
+      'Plugins exposes only the official sidebar toggle, without a new-session action')
+    const geometry = await reopen.evaluate(button => {
+      const box = button.getBoundingClientRect()
+      return { x: box.x, y: box.y, width: box.width, height: box.height,
+        inPageHeader: !!button.closest('[data-plugin-page-header]'),
+        clickable: button.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)),
+        region: getComputedStyle(button).getPropertyValue('-webkit-app-region') }
+    })
+    assert.deepEqual(geometry, { x: 88, y: 12, width: 28, height: 28,
+      inPageHeader: false, clickable: true, region: 'no-drag' },
+    'The official toggle stays beside the native traffic lights, independently of the centered content and scrolling')
+  }
   const checkPluginCaption = async () => {
     const geometry = await drag.evaluate(column => {
       const panel = column.querySelector('[data-plugin-panel]')
@@ -387,14 +405,34 @@ try {
   await checkPluginCaption()
   await collapse.click()
   await checkPluginCaption()
+  await checkPluginReopen()
   await expand()
-  await detailHeader.getByRole('button').last().click()
+  await detailHeader.click()
   await controls.waitFor({ state: 'visible' })
   await collapse.click()
-  await reopen.waitFor({ state: 'visible' })
-  await checkPluginCaption()
+  for (const width of [1800, 800, 1280]) {
+    await page.setViewportSize({ width, height: 840 })
+    await checkPluginCaption()
+    await checkPluginReopen()
+    assert.ok(await pluginPanel.evaluate(panel => Math.abs(panel.querySelector('h1').getBoundingClientRect().x
+      - panel.querySelector('[data-next-plugin-controls]').getBoundingClientRect().x) < 1),
+      'Collapsing the sidebar must not shift the official title away from its content')
+    if (width === 800) await page.screenshot({ path: join(screenshots, 'plugins-collapsed-narrow.png'), animations: 'disabled' })
+  }
+  await addPlugin.click()
+  await page.getByRole('dialog').waitFor()
+  assert.equal(await dragRegion(), 'no-drag')
+  assert.equal(await page.evaluate(() => !!document.elementFromPoint(102, 26)?.closest('[data-plugin-sidebar-control]')), false,
+    'The fixed sidebar toggle must not sit above a modal')
+  await page.getByRole('dialog').press('Escape')
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
   await page.screenshot({ path: join(screenshots, 'plugins-collapsed.png'), animations: 'disabled' })
+  await page.setViewportSize({ width: 1280, height: 480 })
+  await pluginPanel.evaluate(element => { element.scrollTop = 220 })
+  assert.ok(await pluginPanel.evaluate(element => element.scrollTop) > 0)
+  await checkPluginReopen()
   await expand()
+  await page.setViewportSize({ width: 1280, height: 840 })
   // Re-entering the homepage must retain a working sidebar action after navigation.
   await page.getByRole('button', { name: /^(新建会话|New session)$/i }).last().click()
   await collapse.click()

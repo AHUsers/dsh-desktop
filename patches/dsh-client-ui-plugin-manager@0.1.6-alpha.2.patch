@@ -25,55 +25,23 @@ diff --git a/lib/client.js b/lib/client.js
  							bundles: keysOf("plugins.bundle.config"),
  							rows: keysOf("plugins.row.config")
  						};
-@@ -1187,8 +1190,12 @@
+@@ -1186,9 +1189,15 @@
+ 				]
  			});
  		}
- 		/** The top every page shares: the crumb that leads back, then the icon with the page's actions at its right. */
--		function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }) {
--			return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("button", {
-+		function PluginHeaderLeading({ renderSlot }) {
++		/** Sidebar control in native window chrome, independent of the scrolling page header. */
++		function PluginSidebarControl({ renderSlot }) {
 +			if (!(0, _deepseek_ai_dsh_client_ui_primitives.isDarwinDesktop)()) return null;
-+			return (0, react_jsx_runtime.jsx)("div", { "data-plugin-header-leading": "", children: renderSlot("plugins.header.leading", {}) });
++			return (0, react_jsx_runtime.jsx)("div", { "data-plugin-sidebar-control": "", children: renderSlot("plugins.header.leading", {}) });
 +		}
-+		function DetailTop({ crumbLabel, crumbText, onBack, icon, actions, leading }) {
-+			return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("div", { "data-plugin-page-header": "detail", children: [leading, (0, react_jsx_runtime.jsxs)("button", {
+ 		/** The top every page shares: the crumb that leads back, then the icon with the page's actions at its right. */
+ 		function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }) {
+ 			return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("button", {
++				"data-plugin-page-header": "detail",
  				type: "button",
  				className: PluginManagerPage_module_css_default.crumb,
  				"aria-label": crumbLabel,
-@@ -1197,7 +1204,7 @@
- 					className: PluginManagerPage_module_css_default.crumbIcon,
- 					"aria-hidden": "true"
- 				}), (0, react_jsx_runtime.jsx)("span", { children: crumbText })]
--			}), (0, react_jsx_runtime.jsxs)("div", {
-+			})] }), (0, react_jsx_runtime.jsxs)("div", {
- 				className: PluginManagerPage_module_css_default.detailHead,
- 				children: [(0, react_jsx_runtime.jsx)("span", {
- 					className: PluginManagerPage_module_css_default.cardIcon,
-@@ -1262,6 +1269,7 @@
- 				"data-plugin-item-detail": item.id,
- 				children: [
- 					(0, react_jsx_runtime.jsx)(DetailTop, {
-+						leading: (0, react_jsx_runtime.jsx)(PluginHeaderLeading, { renderSlot }),
- 						crumbLabel: t("backToList"),
- 						crumbText: t("crumbRoot"),
- 						onBack
-@@ -1299,6 +1307,7 @@
- 				"data-plugin-row-detail": key,
- 				children: [
- 					(0, react_jsx_runtime.jsx)(DetailTop, {
-+						leading: (0, react_jsx_runtime.jsx)(PluginHeaderLeading, { renderSlot }),
- 						crumbLabel: t("backToPackage", { name: title }),
- 						crumbText: title,
- 						onBack,
-@@ -1348,6 +1357,7 @@
- 				"data-plugin-detail": pkg.name,
- 				children: [
- 					(0, react_jsx_runtime.jsx)(DetailTop, {
-+						leading: (0, react_jsx_runtime.jsx)(PluginHeaderLeading, { renderSlot }),
- 						crumbLabel: t("backToList"),
- 						crumbText: t("crumbRoot"),
- 						onBack,
-@@ -1930,7 +1940,7 @@
+@@ -1930,7 +1939,7 @@
  				};
  			}, [highlight, clearHighlight]);
  			const noticeLine = state.notice === null ? null : noticeText(state.notice, t);
@@ -82,16 +50,17 @@ diff --git a/lib/client.js b/lib/client.js
  			const mine = listed.filter((pkg) => pkg.installed || !pkg.optional);
  			const official = listed.filter((pkg) => pkg.optional && !pkg.installed);
  			const loaded = state.status === "ready" || state.status === "error";
-@@ -2004,7 +2014,8 @@
+@@ -2002,8 +2011,10 @@
+ 				"data-plugin-panel": true,
+ 				"aria-busy": state.status === "loading",
  				children: [
++					(0, react_jsx_runtime.jsx)(PluginSidebarControl, { renderSlot }),
  					showsCards ? (0, react_jsx_runtime.jsxs)("header", {
  						className: PluginManagerPage_module_css_default.pageHead,
--						children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h1", {
 +						"data-plugin-page-header": "list",
-+						children: [(0, react_jsx_runtime.jsx)(PluginHeaderLeading, { renderSlot }), (0, react_jsx_runtime.jsxs)("div", { "data-plugin-header-title": "", children: [(0, react_jsx_runtime.jsx)("h1", {
+ 						children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h1", {
  							className: PluginManagerPage_module_css_default.pageTitle,
  							children: t("title")
- 						}), (0, react_jsx_runtime.jsx)("p", {
 @@ -2034,6 +2045,7 @@
  							})]
  						})]
@@ -128,7 +97,7 @@ diff --git a/lib/types/client/slot-contract.d.ts b/lib/types/client/slot-contrac
  }
  declare module '@deepseek-ai/dsh-client-ui-slots' {
      interface SlotMap {
-+        /** Native sidebar controls within the page's own header. */
++        /** Native sidebar control, separate from the scrolling page header. */
 +        'plugins.header.leading': { kind: 'single'; scope: 'root'; };
 +        /** Controls above the ordinary plugin cards. */
 +        'plugins.overview': { kind: 'list'; scope: 'root'; };

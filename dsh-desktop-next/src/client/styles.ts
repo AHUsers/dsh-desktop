@@ -30,14 +30,21 @@ html[data-platform='darwin'] :has(> [data-shell-overlay]) > :has([data-plugin-pa
   user-select: none;
   -webkit-app-region: drag;
 }
-html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-header-title] { flex: 1; min-width: 0; }
-html[data-platform='darwin'] [data-plugin-header-leading] { display: none; flex: none; }
-html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-header-leading] { display: flex; }
-html[data-platform='darwin'] [data-plugin-header-leading] [data-sidebar-header-controls] { padding-left: max(0px, calc(88px - clamp(24px, 4vw, 48px))); }
-html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-page-header='detail'] { display: flex; align-items: center; gap: 16px; }
+/* The official sidebar toggle stays beside the native traffic lights, outside
+   the centered title's layout and the page's scrolling coordinate system. */
+html[data-platform='darwin'] [data-plugin-sidebar-control] {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 88px;
+  width: auto;
+  z-index: 2;
+}
+html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-sidebar-control] { display: flex; }
+html[data-platform='darwin'] [data-plugin-sidebar-control] [data-sidebar-header-controls] { padding: 0; margin: 0; }
 /* These controls remain clickable even when scrolled into the caption region. */
 html[data-platform='darwin'] [data-plugin-panel] :is(button, a, input, textarea, select, label, summary, [contenteditable='true'], [role='button'], [role='switch'], [role='radio'], [role='checkbox'], [role='tab'], [role='menuitem'], [role='slider']),
-html[data-platform='darwin'] [data-plugin-header-leading] { -webkit-app-region: no-drag; }
+html[data-platform='darwin'] [data-plugin-sidebar-control] { -webkit-app-region: no-drag; }
 /* A modal or full-screen right pane owns its own input surface. */
 html:has([aria-modal='true']) [data-conversation-title-row],
 html:has([aria-modal='true']) :has(> [data-shell-overlay]) > :has([data-plugin-panel])::before,
