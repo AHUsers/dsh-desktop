@@ -108,6 +108,8 @@ The optional `verify:window-controls --computer-use` smoke also enables and disa
 
 The independent recovery assistant shows the startup error and recent logs even if no Host is running. It offers retry, Profile switching, diagnostics, safe mode, repair, rollback and Quit. Restart in Recovery Mode from the Settings header fully stops the background service before relaunching directly into this assistant. The current Profile and plugins are not loaded until Start or retry is selected.
 
+Recovery opened at startup follows the operating system's preferred language order, choosing the first supported Chinese or English language. It does not need a running Host to select its language. Once the main interface is available, native controls continue to follow the language selected in Settings.
+
 - **Safe mode** starts the official interface in a separate temporary home with only shipped bundles, no original credentials, and remote control, Market and browser access disabled. Original data and configuration remain untouched. Leaving safe mode returns to the original Profile and removes the temporary home; work created in that temporary environment is not retained.
 - **Profile repair** backs up the manifest, Profile patch and feature switches before restoring built-in bundles and disabling third-party activation, remote control and Market. A malformed `package.json` can be repaired. Installed plugin files, shared sessions and credentials are retained.
 - **Profile rollback** restores the most recent successful Host-start configuration after backing up the current files and verifying the backup checksums. It covers `package.json`, `cordis.patch.yml` and Next feature switches, not installed plugin versions or shared data.

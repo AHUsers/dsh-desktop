@@ -10,7 +10,7 @@ import { claimDesktopSingleInstance } from './single-instance.ts'
 import { NEXT_PACKAGE, parseFeatures, profileName } from './profiles.ts'
 import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
-import { resolveDesktopLocale } from './menu-locale.ts'
+import { preferredDesktopLocale, resolveDesktopLocale } from './menu-locale.ts'
 import { NextDesktopRuntime } from './desktop-runtime.ts'
 import { DEFAULT_PROFILE, NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState, type DesktopSettingsPage } from './desktop-contract.ts'
 import { portsChanged, parsePreferences } from './desktop-preferences.ts'
@@ -305,7 +305,8 @@ async function main(): Promise<void> {
   await app.whenReady()
   if (quitting) return
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(root, 'build', 'app-icon-mac.png'))
-  windowsLanguage = app.getLocale()
+  // Recovery can open without a Host; Chromium's app locale may differ from the OS language.
+  windowsLanguage = preferredDesktopLocale([...app.getPreferredSystemLanguages(), app.getLocale()])
   protocol.handle('dsh-app', async request => {
     const url = new URL(request.url)
     if (url.hostname === 'shell') {

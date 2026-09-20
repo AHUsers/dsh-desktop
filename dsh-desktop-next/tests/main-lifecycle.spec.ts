@@ -33,7 +33,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
   const app = Object.assign(new EventEmitter(), {
-    setName() {}, setPath() {}, getLocale: () => 'zh-CN', isReady: () => true, whenReady: async () => {},
+    setName() {}, setPath() {}, getLocale: () => 'en-US', getPreferredSystemLanguages: () => ['zh-Hans-CN', 'en-US'], isReady: () => true, whenReady: async () => {},
     requestSingleInstanceLock: () => true, exit: vi.fn(), relaunch: vi.fn(), quit: vi.fn(() => app.emit('before-quit', { preventDefault() {} })),
   })
   class BrowserWindow extends EventEmitter {
@@ -98,6 +98,7 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
     const window = fixture.windows[0]
     const tray = fixture.trays[0]
+    expect(tray.menu[0].label).toBe('打开 DSH Desktop Next')
     expect(tray.menu.at(-1).accelerator).toBe('CmdOrCtrl+Q')
     expect(tray.menu.some((item: any) => item.accelerator === 'CmdOrCtrl+,')).toBe(true)
     const preventDefault = vi.fn()
@@ -186,7 +187,7 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
 })
 
 
-it('boots directly into recovery without starting a Host or loading the official main window', async () => {
+it('boots recovery in the preferred OS language even when the app locale is English, without starting a Host', async () => {
   const home = mkdtempSync(join(tmpdir(), 'next-recovery-boot-'))
   vi.stubEnv('DSH_DESKTOP_NEXT_HOME', home)
   const argv = [...process.argv]
