@@ -23,6 +23,7 @@ import { auxiliaryWindowChromeOptions, auxiliaryWindowHasCustomFrame } from '../
 import { privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
 import { RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
+import { createNativePermissions, installMediaPermissions } from './electron-permissions.ts'
 
 const root = dirname(NEXT_PACKAGE)
 const home = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
@@ -59,6 +60,7 @@ const runtime = new NextDesktopRuntime({
 })
 const native = new NativeDesktop({ root, language: () => windowsLanguage, state, window: () => mainWindow,
   show: openMain, run, warn: error => runtime.diagnostics.append(String(error), 'warn') })
+const permissions = createNativePermissions()
 
 function state(): DesktopState {
   return { ...runtime.state(), platform: process.platform, version,
@@ -298,6 +300,23 @@ async function main(): Promise<void> {
   })
   ipcMain.handle(IPC.state, event => { assertDesktopSender(event); return state() })
   ipcMain.handle(IPC.browserLinks, event => { assertDesktopSender(event); return runtime.browserLinks() })
+  ipcMain.handle(IPC.permissionQuery, (event, permission: unknown) => { assertDesktopSender(event); return permissions.query(permission) })
+  const permissionGesture = async (event: IpcMainInvokeEvent): Promise<void> => {
+    assertDesktopSender(event)
+    if (!event.sender.isFocused() || !await event.sender.executeJavaScript('navigator.userActivation.isActive')) {
+      throw new Error('Desktop permission requests require a focused window and user gesture')
+    }
+    assertDesktopSender(event)
+  }
+  ipcMain.handle(IPC.permissionRequest, async (event, permission: unknown) => {
+    await permissionGesture(event); return permissions.request(permission)
+  })
+  ipcMain.handle(IPC.permissionSettings, async (event, permission: unknown) => {
+    await permissionGesture(event); await permissions.openSettings(permission)
+  })
+  installMediaPermissions(session.defaultSession, permissions, {
+    window: () => mainWindow, language: () => windowsLanguage, warn: error => runtime.diagnostics.append(String(error), 'warn'),
+  })
   ipcMain.handle(IPC.material, event => { assertSender(event, mainWindow, APP_URL); return windowMaterial(runtime.preferences) })
   ipcMain.handle(IPC.command, (event, value: unknown) => { assertDesktopSender(event); return command(value) })
   let picking: Promise<string | null> | undefined

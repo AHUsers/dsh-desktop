@@ -39,6 +39,11 @@ export function apply(ctx: Context): void {
     en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
   }), 'Next window control labels')
   if (window.desktopNext) {
+    const permissions = window.desktopNext.permissions
+    if (permissions) ctx.effect(() => {
+      const dispose = ctx.reflect.provide('desktopPermissions', permissions)
+      return () => { void dispose() }
+    }, 'Native Desktop permissions')
     ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
     ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')

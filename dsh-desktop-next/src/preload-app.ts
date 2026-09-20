@@ -6,6 +6,7 @@ import { syncNativeTheme } from './preload-theme.ts'
 import { syncWindowsAppearance } from './preload-windows.ts'
 import { syncWindowMaterial } from './preload-material.ts'
 import { syncNativeLocale } from './preload-locale.ts'
+import { permissionBridge } from './preload-permissions.ts'
 
 if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   markDocumentPlatform()
@@ -14,6 +15,7 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   syncWindowsAppearance()
   syncWindowMaterial()
   contextBridge.exposeInMainWorld('desktopNext', {
+    permissions: permissionBridge(),
     state: () => ipcRenderer.invoke(IPC.state),
     browserLinks: () => ipcRenderer.invoke(IPC.browserLinks),
     command: (command: unknown) => ipcRenderer.invoke(IPC.command, command),

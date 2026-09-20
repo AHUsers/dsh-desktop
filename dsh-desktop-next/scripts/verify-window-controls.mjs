@@ -47,7 +47,7 @@ try {
     selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
     preferences: { closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off', browserAccess: false,
       networkExposure: 'loopback', port: 0, lanPort: 0, logLevel: 'info', notifications: true,
-      turnCompleted: true, turnFailed: true, jobCompleted: true, jobFailed: true },
+      turnCompleted: true, turnFailed: true, jobCompleted: false, jobFailed: false },
     phase: 'ready', busy: false, failure: '', safeMode: false, home: '[temporary test home]', platform: 'darwin',
     version: '0.1.0-dev.0', trayAvailable: true, notificationsAvailable: true, windowsMicaSupported: false, browserUrl: null, lan: null,
     checkpoint: { created: new Date().toISOString() }, logs: 'Headless UI fixture; native actions are recorded only.',
@@ -59,6 +59,14 @@ try {
       ? controlState.lan.addresses.map(address => `https://${address}:${controlState.lan.actualPort}/?token=${loginToken}`) : [],
   })
   await context.exposeFunction('__nextTestBrowserLinks', browserLinks)
+  const permissionActions = []
+  const permissionStates = { microphone: 'not-determined', screen: 'denied', accessibility: 'unknown' }
+  await context.exposeFunction('__nextTestPermission', (action, permission) => {
+    permissionActions.push({ action, permission })
+    if (action === 'request') permissionStates[permission] = 'granted'
+    const status = permissionStates[permission]
+    return { permission, status, canRequest: status === 'not-determined' || status === 'unknown', canOpenSettings: true }
+  })
   await context.exposeFunction('__nextTestCommand', command => {
     if (command.type === 'preferences' && rejectPreference) { rejectPreference = false; throw new Error('Fixture: preference save rejected') }
     controlCommands.push(command)
@@ -75,6 +83,11 @@ try {
   })
   await context.addInitScript(() => {
     window.desktopNext = { state: () => window.__nextTestState(), browserLinks: () => window.__nextTestBrowserLinks(), command: command => window.__nextTestCommand(command) }
+    window.desktopNext.permissions = {
+      query: permission => window.__nextTestPermission('query', permission),
+      request: permission => window.__nextTestPermission('request', permission),
+      openSettings: permission => window.__nextTestPermission('openSettings', permission),
+    }
   })
   // Serve the Desktop document without the browser Host's inline injections.
   // The published entry must request them through its Desktop boot contract.
@@ -224,6 +237,15 @@ try {
   assert.equal(await settings.getByRole('spinbutton').count(), 0)
   const notifications = settings.getByRole('switch', { name: /启用桌面通知|Enable Desktop notifications/ })
   assert.equal(await settings.getByRole('switch', { name: /后台任务|Background job/ }).count(), 0)
+  const permissions = settings.getByRole('region', { name: /系统权限|System permissions/ })
+  const microphone = permissions.getByRole('group', { name: /麦克风|Microphone/ })
+  await microphone.getByRole('button', { name: /请求授权|Request access/ }).waitFor()
+  assert.ok(permissionActions.every(item => item.action === 'query'), 'Rendering settings must never prompt for permissions')
+  await microphone.getByRole('button', { name: /请求授权|Request access/ }).click()
+  await microphone.getByText(/已允许|Allowed/).waitFor()
+  const screen = permissions.getByRole('group', { name: /屏幕录制|Screen recording/ })
+  await screen.getByRole('button', { name: /打开系统设置|Open system settings/ }).click()
+  assert.ok(permissionActions.some(item => item.action === 'openSettings' && item.permission === 'screen'))
   await notifications.click()
   await page.waitForFunction(() => document.querySelector('[aria-labelledby="dsh-desktop-notifications-title"] [role="switch"]')?.getAttribute('aria-checked') === 'false')
   assert.equal(await settings.getByRole('switch', { name: /本轮任务完成|Current turn completed/ }).isDisabled(), true)

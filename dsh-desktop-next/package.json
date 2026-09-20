@@ -208,6 +208,7 @@
     ".": "./lib/extensions.js",
     "./client": "./lib/client.js",
     "./extensions": "./lib/extensions.js",
+    "./permissions": { "types": "./src/permissions.ts", "default": "./lib/permissions.js" },
     "./package.json": "./package.json",
     "./webserver": "./lib/webserver.js"
   },

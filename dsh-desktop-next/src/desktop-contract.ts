@@ -1,6 +1,7 @@
 /** General renderer state omits credentials; browser login links use a separate native operation. */
 import type { Features } from './profiles.ts'
 import type { DesktopLanHttpsRuntimeSnapshot } from './lan-https-runtime.ts'
+import type { DesktopPermissions } from './permissions.ts'
 
 export const NATIVE_ACCESS_HEADER = 'x-dsh-desktop-renderer'
 export type DesktopNotification =
@@ -71,6 +72,7 @@ export type DesktopCommand =
     | 'diagnostics' | 'open-browser' | 'open-lan' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }
 
 export interface DesktopBridge {
+  readonly permissions?: DesktopPermissions
   state(): Promise<DesktopState>
   browserLinks(): Promise<DesktopBrowserLinks>
   command(command: DesktopCommand): Promise<void>
