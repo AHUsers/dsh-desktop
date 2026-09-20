@@ -2,7 +2,7 @@
 import type { SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DesktopSettingsApi, DesktopSettingsView } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-api.ts'
 import type { DesktopNotificationSettings, DesktopShellSettings } from '../../../dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx'
-import type { DesktopBridge, DesktopBrowserLinks, DesktopCommand, DesktopPreferences, DesktopState } from '../desktop-contract.ts'
+import { DEFAULT_PROFILE, type DesktopBridge, type DesktopBrowserLinks, type DesktopCommand, type DesktopPreferences, type DesktopState } from '../desktop-contract.ts'
 
 const shellFields = { macosMaterial: 'macosMaterial', windowsMaterial: 'windowsMaterial', port: 'port', openBrowser: 'browserAccess', networkExposure: 'networkExposure', logLevel: 'logLevel' } as const
 const notificationFields = { enabled: 'notifications', notifyOnTurnCompletion: 'turnCompleted', notifyOnTurnFailure: 'turnFailed', notifyOnJobCompletion: 'jobCompleted', notifyOnJobFailure: 'jobFailed' } as const
@@ -14,7 +14,7 @@ export function projectSettings(state: DesktopState, links: DesktopBrowserLinks 
   const lanUrls = links.lanUrls
   return {
     current: state.selected,
-    profiles: state.profiles.map(name => ({ name, exists: true, webCapable: !state.unavailableProfiles.includes(name), selectable: !state.unavailableProfiles.includes(name), deletable: name !== state.selected && name !== 'default' })),
+    profiles: state.profiles.map(name => ({ name, exists: true, webCapable: !state.unavailableProfiles.includes(name), selectable: !state.unavailableProfiles.includes(name), deletable: name !== state.selected && name !== DEFAULT_PROFILE })),
     aa: { requested: state.features.remoteControl, effective: enabled && state.features.remoteControl },
     market: { requested: market, effective: enabled ? market : 'disabled', legacyDefaulted: false },
     web: { localUrl: links.localUrl ?? '', lanUrls, lanState: lan?.state ?? 'inactive', lanError: lan?.errorCode ?? null, lanCaFingerprint: lan?.caFingerprint ?? null,

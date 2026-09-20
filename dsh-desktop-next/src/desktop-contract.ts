@@ -4,6 +4,7 @@ import type { DesktopLanHttpsRuntimeSnapshot } from './lan-https-runtime.ts'
 import type { DesktopPermissions } from './permissions.ts'
 
 export const NATIVE_ACCESS_HEADER = 'x-dsh-desktop-renderer'
+export const DEFAULT_PROFILE = 'desktop'
 export type DesktopNotification =
   | { outcome: 'turn-completed'; userMessage: string; assistantMessage: string }
   | { outcome: 'turn-failed' }

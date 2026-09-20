@@ -4,7 +4,7 @@ import { DEFAULT_PREFERENCES, type DesktopState } from '../src/desktop-contract.
 import { relaunchArguments } from '../src/relaunch.ts'
 
 const state: DesktopState = {
-  selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'],
+  selected: 'desktop', profiles: ['desktop', 'work', 'broken'], unavailableProfiles: ['broken'],
   preferences: { ...DEFAULT_PREFERENCES }, features: { market: true, remoteControl: false },
   phase: 'ready', busy: false, failure: '', safeMode: false, home: '/fixture', platform: 'darwin',
   version: '0.1.0-dev.0', trayAvailable: true, notificationsAvailable: true, windowsMicaSupported: false,
@@ -17,12 +17,12 @@ it('keeps the original tray tool order, direct recovery actions and Profile crea
   const menu = desktopMenu(state, 'zh-CN', show, run)
   expect(menu.filter(item => item.type !== 'separator').map(item => item.label)).toEqual([
     '打开 DSH Desktop Next', '重新加载界面', '打开 DSH 终端', '导出诊断信息…', '进入安全模式…',
-    'Profile：default', '设置…', '恢复助手…', '退出',
+    'Profile：desktop', '设置…', '恢复助手…', '退出',
   ])
-  const profiles = menu.find(item => item.label === 'Profile：default')!.submenu
+  const profiles = menu.find(item => item.label === 'Profile：desktop')!.submenu
   if (!Array.isArray(profiles)) throw new Error('Missing Profile submenu')
   expect(profiles.find(item => item.label === 'broken（不可用于桌面端）')!.enabled).toBe(false)
-  ;(profiles.find(item => item.label === 'default')!.click as () => void)()
+  ;(profiles.find(item => item.label === 'desktop')!.click as () => void)()
   expect(run).not.toHaveBeenCalled()
   ;(profiles.find(item => item.label === 'work')!.click as () => void)()
   expect(run).toHaveBeenLastCalledWith({ type: 'switch', name: 'work' })

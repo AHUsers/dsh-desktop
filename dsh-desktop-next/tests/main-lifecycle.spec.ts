@@ -15,7 +15,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   preferences = { ...DEFAULT_PREFERENCES }
   busy = false
-  selected = 'default'
+  selected = 'desktop'
   safeMode = false
   recoveryMode = false
   backend = { host: undefined }
@@ -25,7 +25,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   start = fixture.start
   close = fixture.close
   browserLinks() { return { localUrl: null, lanUrls: [] } }
-  state() { return { selected: 'default', profiles: ['default'], unavailableProfiles: [], features: { remoteControl: false, market: true },
+  state() { return { selected: 'desktop', profiles: ['desktop'], unavailableProfiles: [], features: { remoteControl: false, market: true },
     preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : fixture.phase, busy: this.busy, failure: 'Fixture Host failure', safeMode: false,
     home: 'temporary', browserUrl: null, lan: null, checkpoint: null, logs: '' } }
   report() {}

@@ -6,7 +6,7 @@ import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DesktopPreferenceStore, parsePreferences } from './desktop-preferences.ts'
 import { DEFAULT_FEATURES, NextProfiles } from './profiles.ts'
-import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type DesktopNotification } from './desktop-contract.ts'
+import { DEFAULT_PREFERENCES, DEFAULT_PROFILE, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type DesktopNotification } from './desktop-contract.ts'
 import { DesktopDiagnostics } from './diagnostics.ts'
 import { NextRecovery } from './recovery.ts'
 import { maskSecrets } from './mask-secrets.ts'
@@ -37,7 +37,7 @@ export class NextDesktopRuntime {
   readonly diagnostics: DesktopDiagnostics
   readonly backend: DesktopBackendController<{ start(): Promise<void>; stop(): Promise<void> }>
   preferences: DesktopPreferences = { ...DEFAULT_PREFERENCES }
-  selected = 'default'
+  selected: string = DEFAULT_PROFILE
   safeMode = false
   recoveryMode = false
   busy = false
@@ -83,8 +83,8 @@ export class NextDesktopRuntime {
         privateDirectory(this.recovery.directory)
         this.safeHome = mkdtempSync(join(this.recovery.directory, 'safe-runtime-'))
         const safe = new NextProfiles(this.safeHome)
-        safe.ensure('default')
-        safe.setFeatures('default', { remoteControl: false, market: false })
+        safe.ensure(DEFAULT_PROFILE)
+        safe.setFeatures(DEFAULT_PROFILE, { remoteControl: false, market: false })
       }
       if (!this.safeMode) this.profiles.ensure(this.selected)
     })
@@ -192,7 +192,7 @@ export class NextDesktopRuntime {
   private createHost(onFailure: (error: Error) => void) {
     const { options } = this
     const actualHome = this.safeMode ? this.safeHome! : options.home
-    const profile = this.safeMode ? 'default' : this.selected
+    const profile = this.safeMode ? DEFAULT_PROFILE : this.selected
     const effective = this.safeMode ? { ...this.preferences, browserAccess: false, networkExposure: 'loopback' as const, port: 0 } : this.preferences
     const addresses = options.addresses()
     const token = randomBytes(32).toString('base64url')

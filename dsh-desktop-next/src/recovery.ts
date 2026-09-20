@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { atomicJson, atomicText, privateDirectory, readPrivateFile } from './private-files.ts'
 import { NextProfiles, profileName } from './profiles.ts'
+import { DEFAULT_PROFILE } from './desktop-contract.ts'
 
 const FILES = ['package.json', 'cordis.patch.yml', 'desktop-next.features.json'] as const
 type ConfigFile = typeof FILES[number]
@@ -97,7 +98,7 @@ export class NextRecovery {
   }
 
   removeProfile(name: string, active: string): void {
-    if (name === active || name === 'default') throw new Error('The active and default Profiles cannot be removed')
+    if (name === active || name === DEFAULT_PROFILE) throw new Error('The active and default Profiles cannot be removed')
     const source = this.profiles.directory(name)
     if (!this.profiles.list().includes(name)) throw new Error('Profile does not exist')
     privateDirectory(this.directory)

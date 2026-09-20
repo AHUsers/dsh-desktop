@@ -18,9 +18,9 @@ const workspace = join(home, 'workspace')
 mkdirSync(workspace)
 const screenshots = join(root, '.desktop-next', 'verification')
 const manager = new NextProfiles(home)
-manager.ensure('default')
-manager.setFeatures('default', { market: false, remoteControl: false })
-const host = new DesktopHostProcess(process.execPath, root, manager.directory('default'), undefined,
+manager.ensure('desktop')
+manager.setFeatures('desktop', { market: false, remoteControl: false })
+const host = new DesktopHostProcess(process.execPath, root, manager.directory('desktop'), undefined,
   { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' }, undefined, undefined, 'runtime', undefined,
   join(root, 'lib', 'host.js'))
 let browser
@@ -47,7 +47,7 @@ try {
   const loginToken = 'L'.repeat(43)
   let rejectPreference = false
   const controlState = {
-    selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
+    selected: 'desktop', profiles: ['desktop', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
     preferences: { closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off', browserAccess: false,
       networkExposure: 'loopback', port: 0, lanPort: 0, logLevel: 'info', notifications: true,
       turnCompleted: true, turnFailed: true, jobCompleted: false, jobFailed: false },

@@ -12,7 +12,7 @@ import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { resolveDesktopLocale } from './menu-locale.ts'
 import { NextDesktopRuntime } from './desktop-runtime.ts'
-import { NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState, type DesktopSettingsPage } from './desktop-contract.ts'
+import { DEFAULT_PROFILE, NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState, type DesktopSettingsPage } from './desktop-contract.ts'
 import { portsChanged, parsePreferences } from './desktop-preferences.ts'
 import { NativeDesktop, applyWindowMaterial } from './native-desktop.ts'
 import { desktopLanAddresses } from './lan-addresses.ts'
@@ -205,7 +205,7 @@ async function command(value: unknown): Promise<void> {
     if (type === 'create') { runtime.profiles.create(profileName(input.name)); return }
     if (type === 'delete') {
       const name = profileName(input.name)
-      if (name === runtime.selected || name === 'default') throw new Error(t('不能移除当前或默认 Profile。', 'Cannot remove the active or default Profile.'))
+      if (name === runtime.selected || name === DEFAULT_PROFILE) throw new Error(t('不能移除当前或默认 Profile。', 'Cannot remove the active or default Profile.'))
       if (await confirmed(t(`移除 Profile「${name}」？`, `Remove Profile “${name}”?`), t('其文件将移入恢复备份目录。共享的会话和设置会保留。', 'Its files move to recovery backups. Shared sessions and settings are retained.'))) runtime.recovery.removeProfile(name, runtime.selected)
       return
     }
