@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { DesktopHostProcess } from '../lib/host-process.js'
+import { NextRecovery } from '../lib/recovery.js'
 import { NEXT_PACKAGE, NextProfiles } from '../lib/profiles.js'
 import { bundledPnpmEntry, createPackageRunner } from '../lib/extensions.js'
 import { forwardWebRequest } from '../lib/web-document.js'
@@ -219,6 +220,9 @@ try {
   assert.equal((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin'), false)
   const withRecentDependency = await rpc('installBundle', { spec: fixture })
   assert.equal(withRecentDependency.application, 'applied', JSON.stringify(withRecentDependency))
+  const recovery = new NextRecovery(manager)
+  recovery.checkpoint('desktop')
+  const checkpoint = recovery.checkpoints('desktop')[0]
   const removedAgain = await rpc('removeBundle', { name: 'fixture-next-plugin' })
   assert.equal(removedAgain.application, 'applied', JSON.stringify(removedAgain))
   assert.equal(readFileSync(policyFile, 'utf8'), policy, 'Desktop policy must not rewrite Profile configuration')
@@ -226,6 +230,18 @@ try {
   assert.equal(finalManifest.dependencies[registry.name], registry.version)
   assert.equal(finalManifest.dsh.profile.bundles.includes('fixture-next-plugin'), false)
   await runner.dispose()
+  await stop()
+  // Reinstall dependencies after restoring a manifest that refers to a removed plugin.
+  await recovery.restore('desktop', checkpoint.id)
+  runner = createPackageRunner(pnpmInvocation, dir)
+  const reconcile = runner.runPlugin(['install', '--offline', '--ignore-scripts'], dir)
+  let reconciliationOutput = ''
+  reconcile.stdout.on('data', chunk => { reconciliationOutput += chunk })
+  reconcile.stderr.on('data', chunk => { reconciliationOutput += chunk })
+  assert.equal((await reconcile.done).exitCode, 0, reconciliationOutput)
+  await runner.dispose()
+  ;({ origin, cookie } = await boot('desktop'))
+  assert.ok((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin' && row.installed), 'Rollback must restore the removed plugin before reboot')
   await stop()
   writeFileSync(join(dir, 'cordis.patch.yml'), ': broken: [yaml')
   await manager.recover('desktop')

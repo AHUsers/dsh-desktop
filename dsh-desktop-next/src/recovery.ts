@@ -4,7 +4,7 @@ import { lstatSync, readdirSync, renameSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { atomicJson, atomicText, privateDirectory, readPrivateFile } from './private-files.ts'
-import { NextProfiles, profileName } from './profiles.ts'
+import { NextProfiles, profileName, WEB_BUNDLES, NEXT_PACKAGE } from './profiles.ts'
 import { DEFAULT_PROFILE } from './desktop-contract.ts'
 
 const FILES = ['package.json', 'cordis.patch.yml', 'desktop-next.features.json'] as const
@@ -38,19 +38,26 @@ export class NextRecovery {
     return target
   }
 
-  latest(name: string): { directory: string; created: string } | null {
+  latest(name: string): { directory: string; created: string } | null { return this.checkpoints(name)[0] ?? null }
+
+  checkpoints(name: string): { directory: string; created: string; id: string; fileCount: number; totalBytes: number }[] {
+    const result: { directory: string; created: string; id: string; fileCount: number; totalBytes: number }[] = []
     profileName(name)
-    if (!lstatSync(this.directory, { throwIfNoEntry: false })) return null
+    if (!lstatSync(this.directory, { throwIfNoEntry: false })) return result
     privateDirectory(this.directory)
     const entries = readdirSync(this.directory, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort().reverse()
     for (const entry of entries) {
       const directory = join(this.directory, entry)
       try {
         const snapshot = this.readSnapshot(directory, name)
-        if (snapshot.healthy) return { directory, created: snapshot.created }
+        if (snapshot.healthy) {
+          const contents = FILES.map(file => readPrivateFile(join(directory, file)))
+          result.push({ directory, id: entry, created: snapshot.created, fileCount: contents.filter(text => text !== undefined).length, totalBytes: contents.reduce((sum, text) => sum + Buffer.byteLength(text ?? ''), 0) })
+          if (result.length === 3) break
+        }
       } catch { /* A partial or corrupt backup cannot become a restore target. */ }
     }
-    return null
+    return result
   }
 
   checkpoint(name: string): void {
@@ -65,8 +72,8 @@ export class NextRecovery {
     this.backup(name, 'successful-start', true)
   }
 
-  async restore(name: string): Promise<void> {
-    const latest = this.latest(name)
+  async restore(name: string, id?: string): Promise<void> {
+    const latest = id === undefined ? this.latest(name) : this.checkpoints(name).find(item => item.id === id)
     if (!latest) throw new Error('No successful-start configuration is available')
     const dir = this.profiles.directory(name)
     await withFileLock(join(dir, 'lock'), async () => {
@@ -85,6 +92,35 @@ export class NextRecovery {
         else if (readPrivateFile(path) !== undefined) unlinkSync(path)
       }
     })
+  }
+
+  bundles(name: string) {
+    const manifest = JSON.parse(readPrivateFile(join(this.profiles.directory(name), 'package.json')) ?? '{}')
+    const bundles: unknown = manifest.dsh?.profile?.bundles
+    if (!Array.isArray(bundles) || bundles.some(item => typeof item !== 'string')) throw new Error('Invalid Next Profile manifest')
+    // Default web layers are only part of the product: optional shipped bundles
+    // and official extensions must never become recovery uninstall targets.
+    const shipped = JSON.parse(readPrivateFile(NEXT_PACKAGE)!) as {
+      name: string; dependencies?: Record<string, string>; dsh?: { optionalBundles?: string[] }
+    }
+    const protectedNames = new Set([shipped.name, ...WEB_BUNDLES,
+      ...Object.keys(shipped.dependencies ?? {}), ...shipped.dsh?.optionalBundles ?? []])
+    return [...new Set(bundles as string[])].filter(packageName =>
+      !protectedNames.has(packageName) && !packageName.startsWith('@deepseek-ai/'))
+      .map(packageName => ({ bundleId: packageName, packageName,
+        status: 'active' as const, owner: 'profile' as const, action: 'uninstall' as const }))
+  }
+
+  /** The original environment is stopped by the shell before resetting its data. */
+  factoryReset(): string {
+    privateDirectory(this.directory)
+    const backup = join(this.directory, `factory-reset-${Date.now()}-${randomUUID()}`)
+    privateDirectory(backup)
+    for (const entry of readdirSync(this.profiles.home)) {
+      if (['recovery', 'electron-user-data', 'desktop-next-location.json'].includes(entry)) continue
+      renameSync(join(this.profiles.home, entry), join(backup, entry))
+    }
+    return backup
   }
 
   repairGlobalPatch(): void {
