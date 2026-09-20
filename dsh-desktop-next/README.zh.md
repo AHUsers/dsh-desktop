@@ -38,7 +38,7 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 
 ## 使用
 
-在官方主界面中打开 **设置 → 桌面**。托盘的 **设置…** 和 `CmdOrCtrl+,` 会唤起主窗口，打开同一个官方设置弹窗，不再创建独立设置窗口。恢复和 Profile 工具保留现有窗口。Host 启动失败时，设置快捷入口会打开恢复助手。切换 Profile 或更改端口会中断当前任务并重新启动 Host；浏览器和局域网访问开关即时生效，无需重启。
+在官方主界面中打开 **设置 → 桌面设置**。托盘的 **设置…** 和 `CmdOrCtrl+,` 会唤起主窗口，打开同一个官方设置弹窗，不再创建独立设置窗口。恢复和 Profile 工具保留现有窗口。Host 启动失败时，设置快捷入口会打开恢复助手。切换 Profile 或更改端口会中断当前任务并重新启动 Host；浏览器和局域网访问开关即时生效，无需重启。
 
 - **托盘与后台运行：** 沿用原桌面版的常用项顺序：打开主窗口、重新加载界面、打开 DSH 终端、导出诊断、进入／退出安全模式、Profile 选择与新建。另保留桌面设置和恢复助手入口；原生菜单跟随应用内语言。开启后台运行且托盘可用时，关闭主窗口不会停止 Host 和远控连接；明确选择退出才会关闭 HTTPS 入口与 Host。系统托盘不可用时，关闭主窗口会退出应用，避免留下无法重新打开的进程。
 - **桌面设置：** 后台运行、macOS 透明材质、受支持的 Windows Mica、本机和局域网访问、日志级别，以及用户回合完成／失败时的独立通知开关。后台任务不发送通知。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Acrylic 继续停用；Mica 要求 Windows 内部版本不低于 22621。通知还需系统授权，仅在主窗口未聚焦时显示。成功通知以本轮用户消息为标题、AI 最后一条可见回复为正文，过长内容会截断；失败通知显示通用状态，子代理和自动回合不发送通知。
@@ -59,7 +59,7 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 
 ### 原生权限与 Computer Use
 
-Computer Use 旁的齿轮，以及**设置 → 桌面 → 授权设置**，都使用应用内授权弹窗，复用官方 Modal、Button 和 StateDot 组件。弹窗显示屏幕录制、macOS 辅助功能和麦克风的权限状态。打开弹窗时只查询权限；用户点击按钮后才请求系统授权或打开对应的系统隐私设置。macOS 系统设置中的权限变更可能需要重启应用。Windows 麦克风限制提供隐私设置入口；平台不支持的状态查询返回 `unknown`，不假定已经授权。
+Computer Use 旁的齿轮，以及**设置 → 桌面设置 → 授权设置**，都使用应用内授权弹窗，复用官方 Modal、Button 和 StateDot 组件。弹窗显示屏幕录制、macOS 辅助功能和麦克风的权限状态。打开弹窗时只查询权限；用户点击按钮后才请求系统授权或打开对应的系统隐私设置。macOS 系统设置中的权限变更可能需要重启应用。Windows 麦克风限制提供隐私设置入口；平台不支持的状态查询返回 `unknown`，不假定已经授权。
 
 Next 向原生客户端插件和 Host 插件提供 Cordis 服务 `desktopPermissions`。从 `dsh-desktop-next/permissions` 导入类型，并注入 `desktopPermissions`；普通浏览器客户端没有此服务。方法为 `query(permission)`、`request(permission)` 和 `openSettings(permission)`，权限名称包括 `microphone`、`screen`、`accessibility`。结果包含 `status`、`canRequest` 和 `canOpenSettings`。
 
