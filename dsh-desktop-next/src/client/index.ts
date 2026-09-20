@@ -38,8 +38,8 @@ function WindowControls({ toggleSidebar, t }: PropsLocale<'desktop-next'> & { to
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('desktop-next', {
-    zh: { 'sidebar.open': '展开侧边栏', settings: '桌面', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
-    en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
+    zh: { 'sidebar.open': '展开侧边栏', settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
+    en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
   }), 'Next window control labels')
   ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
@@ -53,8 +53,9 @@ export function apply(ctx: Context): void {
     ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
     const t = ctx.locale.bind('desktop-next')
+    // The shared settings shell maps the legacy section ID to our display icon.
     ctx.slots.inject('settings.section', () => ctx.slots.register({
-      name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),
+      name: 'settings.section', id: 'desktop', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),
     }, DesktopSettings))
     ctx.slots.inject('settings.action', () => ctx.slots.register({
       name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next', inject: () => ({ adapter }),
