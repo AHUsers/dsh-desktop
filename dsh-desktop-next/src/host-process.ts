@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { desktopNodeEnvironment } from './node-environment.ts'
 import type { DesktopNotification } from './desktop-contract.ts'
 import { isDesktopNotification } from './notifications.ts'
+import type { DesktopPermission, DesktopPermissionAction, DesktopPermissionSnapshot } from './permissions.ts'
 
 interface ReadyEvent {
   readonly type: 'ready'
@@ -17,7 +18,7 @@ interface FatalEvent {
   readonly message: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; notification: DesktopNotification } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
+type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'permission'; requestId: number; action: DesktopPermissionAction; permission: DesktopPermission } | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; notification: DesktopNotification } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -38,6 +39,10 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
       return typeof candidate.message === 'string'
     case 'notification':
       return isDesktopNotification(candidate.notification)
+    case 'permission':
+      return Number.isSafeInteger(candidate.requestId) && (candidate.requestId as number) > 0
+        && typeof candidate.action === 'string' && ['query', 'request', 'open-settings'].includes(candidate.action)
+        && typeof candidate.permission === 'string' && ['microphone', 'screen', 'accessibility'].includes(candidate.permission)
     case 'desktop-action':
       return candidate.action === 'restart' || candidate.action === 'terminal'
     case 'update-tasks':
@@ -117,6 +122,7 @@ export class DesktopHostProcess {
     private readonly onNotification?: (notification: DesktopNotification) => void,
     private readonly onLog?: (chunk: string) => void,
     private readonly onTerminal?: () => void,
+    private readonly onPermission?: (action: DesktopPermissionAction, permission: DesktopPermission) => Promise<DesktopPermissionSnapshot>,
   ) {}
 
   /**
@@ -160,6 +166,15 @@ export class DesktopHostProcess {
       else if (message.type === 'fatal') this.fail(new Error(message.message))
       else if (message.type === 'notification') {
         if (!this.stopping && !this.failureReported) this.onNotification?.(message.notification)
+      }
+      else if (message.type === 'permission') {
+        const reply = (result: object): void => {
+          if (child.connected && !this.stopping && !this.failureReported) child.send({ type: 'permission-result', requestId: message.requestId, ...result }, () => {})
+        }
+        void Promise.resolve().then(() => {
+          if (this.stopping || this.failureReported || !this.onPermission) throw new Error('Desktop permissions are unavailable')
+          return this.onPermission(message.action, message.permission)
+        }).then(snapshot => reply({ snapshot }), () => reply({ error: 'Desktop permissions are unavailable' }))
       }
       else if (message.type === 'desktop-action') {
         if (!this.stopping && !this.failureReported) {

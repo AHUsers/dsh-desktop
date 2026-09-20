@@ -55,6 +55,44 @@ Browser access is disabled by default. Enabling local access provides an authent
 
 The settings page displays the complete local login URL and a separate HTTPS login URL for every LAN address, including the browser `token`. Each row opens or copies that exact URL. The login links are read through sender-validated native IPC and kept out of general runtime state and diagnostics. The page can also export the installation’s public CA certificate. Trust that certificate on the other device after comparing its SHA-256 fingerprint. Login links grant access and should only be shared with trusted devices. The CA private key is sealed with OS-backed storage; if secure storage or a suitable LAN address is unavailable, LAN HTTPS stays closed and the UI shows the failure. Native renderer credentials are never copied into these links and are stripped at the LAN edge.
 
+### Native permissions and Computer Use
+
+The existing Desktop settings page includes microphone, screen-recording and macOS Accessibility status. Opening the app or settings only queries permissions. A user click requests OS consent or opens the corresponding system privacy pane. On macOS, changes made in System Settings may require restarting the application. Windows microphone restrictions link to Windows privacy settings; unsupported status APIs report `unknown`, never a fabricated grant.
+
+Next provides the `desktopPermissions` Cordis service to native client plugins and Host plugins. Import its types from `dsh-desktop-next/permissions` and inject `desktopPermissions`. Ordinary browser clients do not receive this service. Its methods are `query(permission)`, `request(permission)` and `openSettings(permission)`, where permission is `microphone`, `screen` or `accessibility`. Results include `status`, `canRequest` and `canOpenSettings`.
+
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+import type {} from 'dsh-desktop-next/permissions'
+
+export const inject = ['desktopPermissions']
+
+// Call directly from the native client plugin's Record button.
+export async function record(ctx: Context) {
+  const state = await ctx.desktopPermissions.request('microphone')
+  if (state.status === 'denied' || state.status === 'restricted') return
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  // Pass the stream to the recorder; stop every track when recording ends.
+  return stream
+}
+```
+
+Client requests require an active user gesture and the owning foreground window. Host requests cannot impersonate a user gesture: they reveal the existing Desktop permission settings and return the current OS state, so the plugin must recheck after the user authorizes. Host IPC uses correlated, bounded requests and rejects pending work on teardown. Permission status is always read again from the OS.
+
+Screen sharing uses `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })` directly from the user's Share button. On macOS 15 and later, Electron uses the system picker; other systems use a native source-selection menu. No source is selected automatically. Per-capture system-picker consent can differ from the global screen-recording grant. The permission service does not record media, and screen sharing does not grant computer input control. The development Electron app already declares microphone usage in its Info.plist; a future packaged Next app must retain `NSMicrophoneUsageDescription` with the product's explanation.
+
+The official `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2` provider is bundled and **disabled by default**. Open **Plugins → Computer Use** to enable it and read its live loading status. This entry uses the official Plugins slot, switch and plugin manager; its Profile row ID is `computer-use-cua-driver-native`. The shared `computer-use` registry is already provided. Tools and screenshots use existing conversation tool cards and image attachments; screenshot understanding requires a model route declaring image input. The permission button opens the existing Desktop settings.
+
+The version-scoped Yarn patch at `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch` routes `check_permissions` through `desktopPermissions` when available. `prompt: true` reveals Desktop settings for missing grants, then the driver performs a read-only check with `prompt: false`. The driver remains the authority for its own actual permission status; no grant is inferred from the Desktop response. Without the Desktop service, the provider retains upstream behavior. The pinned `@trycua/cua-driver@0.28.0` binary, operation tools, image handling and shutdown ownership are unchanged. Only one provider can register, but that does not serialize concurrent Sessions operating the same desktop.
+
+Unit tests exercise the installed patched provider with a fake native SDK. The optional native activation check requires a supported SDK platform, loads and shuts down the real provider, and sends no input or screenshots:
+
+```sh
+corepack yarn workspace dsh-desktop-next verify:host --computer-use
+```
+
+The optional `verify:window-controls --computer-use` smoke also enables and disables the real provider through the official frontend in headless Chromium, without calling its computer tools. Native OS consent and actual computer actions still need manual acceptance.
+
 ### Recovery
 
 The independent recovery assistant shows the startup error and recent logs even if no Host is running. It offers retry, Profile switching, diagnostics, safe mode, repair, rollback and Quit. Restart in Recovery Mode from the Settings header fully stops the background service before relaunching directly into this assistant. The current Profile and plugins are not loaded until Start or retry is selected.

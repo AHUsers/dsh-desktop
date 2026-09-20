@@ -6,11 +6,17 @@ import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { readProfilePlugins, type ProfilePnpmInvocation } from '@deepseek-ai/dsh-app-boot'
 import { installNotifications } from './notifications.ts'
+import { HostPermissions } from './host-permissions.ts'
 
 export const name = 'desktop-next-capabilities'
 export const inject = ['profileContext']
 
 export function apply(ctx: Context): void {
+  if (process.send) {
+    const permissions = new HostPermissions(process)
+    ctx.provide('desktopPermissions', permissions)
+    ctx.effect(() => permissions.dispose, 'Next Host permission bridge')
+  }
   if (process.send) installNotifications(ctx, notification => {
     if (process.connected) process.send?.({ type: 'notification', notification }, () => {})
   })

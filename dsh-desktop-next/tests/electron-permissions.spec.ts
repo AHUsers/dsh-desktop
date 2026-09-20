@@ -58,6 +58,15 @@ it('requires a gesture for a new microphone request', async () => {
   expect(permission.request).not.toHaveBeenCalled()
 })
 
+it('settles consent callbacks once when the requesting frame has gone away', async () => {
+  const { request, display, owner } = setup()
+  const microphone = vi.fn(() => { throw new Error('Frame gone') })
+  const screen = vi.fn(() => { throw new Error('Frame gone') })
+  request(owner.webContents, 'media', microphone, { requestingUrl: 'dsh-app://app/', isMainFrame: true, mediaTypes: ['audio'] })
+  display({ frame: owner.webContents.mainFrame, securityOrigin: 'dsh-app://app', videoRequested: true, audioRequested: false, userGesture: true }, screen)
+  await vi.waitFor(() => { expect(microphone).toHaveBeenCalledOnce(); expect(screen).toHaveBeenCalledOnce() })
+})
+
 it('uses the system picker or an explicit source selection and handles cancellation', async () => {
   const { display, owner, picker } = setup()
   expect(picker).toEqual({ useSystemPicker: true })

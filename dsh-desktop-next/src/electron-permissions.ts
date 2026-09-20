@@ -38,6 +38,16 @@ function appOrigin(value: string): boolean {
   try { const url = new URL(value); return url.protocol === 'dsh-app:' && url.host === 'app' } catch { return false }
 }
 
+/** A frame may close while native consent is open; settle its callback at most once. */
+function replyOnce<T>(callback: (value: T) => void, warn: (error: unknown) => void): (value: T) => void {
+  let replied = false
+  return value => {
+    if (replied) return
+    replied = true
+    try { callback(value) } catch (error) { warn(error) }
+  }
+}
+
 export function installMediaPermissions(session: Session, permissions: NativePermissions, options: {
   window(): BrowserWindow | undefined
   language(): string
@@ -55,28 +65,30 @@ export function installMediaPermissions(session: Session, permissions: NativePer
     return true
   })
   session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const reply = replyOnce(callback, options.warn)
     const allowed = (): boolean => trusted(contents, details.requestingUrl, details.isMainFrame)
-    if (!allowed()) return callback(false)
-    if (permission !== 'media') return callback(true)
+    if (!allowed()) return reply(false)
+    if (permission !== 'media') return reply(true)
     const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined
-    if (!mediaTypes?.length || mediaTypes.some(type => type !== 'audio') || !options.window()?.isFocused()) return callback(false)
+    if (!mediaTypes?.length || mediaTypes.some(type => type !== 'audio') || !options.window()?.isFocused()) return reply(false)
     void (async () => {
       if (!await contents.executeJavaScript('navigator.userActivation.isActive') || !allowed()) return false
       const result = await permissions.request('microphone')
       return allowed() && (result.status === 'granted' || process.platform === 'linux' && result.status === 'unknown')
-    })().then(callback, error => { options.warn(error); callback(false) })
+    })().then(reply, error => { options.warn(error); reply(false) })
   })
   let picking = false
   session.setDisplayMediaRequestHandler((request, callback) => {
+    const reply = replyOnce(callback, options.warn)
     const owner = options.window()
     if (picking || !owner || owner.isDestroyed() || request.frame !== owner.webContents.mainFrame
       || !appOrigin(request.securityOrigin) || !owner.webContents.getURL().startsWith(APP_URL)
-      || !request.userGesture || !request.videoRequested || !owner.isFocused()) return callback({})
+      || !request.userGesture || !request.videoRequested || !owner.isFocused()) return reply({})
     picking = true
     void chooseScreen(owner, options.language()).then(source => {
       if (!owner.isDestroyed() && request.frame === owner.webContents.mainFrame && owner.webContents.getURL().startsWith(APP_URL)) {
-        callback(source ? { video: source } : {})
-      } else callback({})
-    }).catch(error => { options.warn(error); callback({}) }).finally(() => { picking = false })
+        reply(source ? { video: source } : {})
+      } else reply({})
+    }).catch(error => { options.warn(error); reply({}) }).finally(() => { picking = false })
   }, { useSystemPicker: true })
 }

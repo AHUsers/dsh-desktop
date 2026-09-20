@@ -65,7 +65,7 @@ export type DesktopCommand =
   | { type: 'create' | 'switch' | 'delete'; name: string }
   | { type: 'features'; features: Features }
   | { type: 'preferences'; preferences: DesktopPreferences }
-  | { type: 'controls'; page?: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' }
+  | { type: 'controls'; page?: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' }
   | { type: 'restart-app' | 'restart-recovery' | 'close-controls' }
   | { type: 'restart' | 'recover' | 'safe-mode' | 'normal-mode' | 'rollback' | 'repair-global'
     | 'reload' | 'devtools' | 'terminal' | 'open-home' | 'open-profile' | 'open-logs' | 'open-backups'

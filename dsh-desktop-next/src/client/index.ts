@@ -12,6 +12,7 @@ import { installSidebarFooterStyles } from '../../../dsh-plugin-desktop-beta/src
 import { NextSettingsAdapter } from './settings-adapter.ts'
 import { NextDesktopSettings, NextDesktopActions } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
+import { registerComputerUse } from './computer-use.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -47,6 +48,7 @@ export function apply(ctx: Context): void {
     ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
     ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
+    registerComputerUse(ctx)
     const t = ctx.locale.bind('desktop-next')
     ctx.slots.inject('settings.section', () => ctx.slots.register({
       name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),

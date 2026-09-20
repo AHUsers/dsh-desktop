@@ -132,6 +132,26 @@ try {
   assert.equal(switchedState.status, 200)
   await switchedState.body?.cancel()
   await stop()
+  if (process.argv.includes('--computer-use')) {
+    const cua = manager.create('computer-use')
+    manager.setFeatures('computer-use', { remoteControl: false, market: false })
+    writeFileSync(join(cua, 'cordis.patch.yml'), '- id: computer-use-cua-driver-native\n  disabled: false\n')
+    const enabled = await boot('computer-use')
+    const rpcId = crypto.randomUUID()
+    const response = await fetch(`${enabled.origin}/api/pluginManager/listPlugins`, {
+      method: 'POST', headers: { cookie: enabled.cookie, origin: enabled.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId, method: 'pluginManager/listPlugins', payload: { args: {} } }),
+    })
+    assert.equal(response.status, 200)
+    const reply = await response.json()
+    assert.equal(reply.rpcId, rpcId)
+    assert.equal(reply.result.ok, true, JSON.stringify(reply))
+    const provider = reply.result.value.find(row => row.moduleName === '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native')
+    assert.equal(provider?.enabled, true)
+    assert.equal(provider?.fiberPhase, 'active', JSON.stringify(provider))
+    await stop()
+    console.log('Opt-in Cua native provider activation and teardown passed without capturing screens, sending input or prompting for OS permissions.')
+  }
   console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, AA composition, offline pnpm, native Market sources/uninstall/restart without Origin, graceful shutdown, recovery boot and profile switch.`)
 } finally {
   await runner?.dispose()

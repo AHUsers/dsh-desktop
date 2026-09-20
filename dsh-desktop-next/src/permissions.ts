@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/cordis'
 
 export type DesktopPermission = 'microphone' | 'screen' | 'accessibility'
 export type DesktopPermissionStatus = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'
+export type DesktopPermissionAction = 'query' | 'request' | 'open-settings'
 
 export interface DesktopPermissionSnapshot {
   readonly permission: DesktopPermission
@@ -15,9 +16,9 @@ export interface DesktopPermissionSnapshot {
 export interface DesktopPermissions {
   /** Reads current OS state without prompting. Unknown does not imply a grant. */
   query(permission: DesktopPermission): Promise<DesktopPermissionSnapshot>
-  /** Call from a user gesture. Requests OS consent without starting recording. */
+  /** Renderer: call from a user gesture. Host: reveals Desktop Settings and returns current state. */
   request(permission: DesktopPermission): Promise<DesktopPermissionSnapshot>
-  /** Call from a user gesture. Opens the fixed OS privacy pane for this permission. */
+  /** Renderer: opens the fixed OS pane from a gesture. Host: reveals Desktop Settings. */
   openSettings(permission: DesktopPermission): Promise<void>
 }
 
@@ -28,7 +29,7 @@ export function desktopPermission(value: unknown): DesktopPermission {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Native Next renderer only; absent in the Host and ordinary browsers. */
+    /** Next native renderer or Host; absent in ordinary browsers. */
     desktopPermissions: DesktopPermissions
   }
 }

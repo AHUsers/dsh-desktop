@@ -57,6 +57,16 @@ const runtime = new NextDesktopRuntime({
   onRestart: () => run({ type: 'restart' }),
   onTerminal: () => run({ type: 'terminal' }),
   onNotification: notification => native.notify(notification),
+  onPermission: async (action, permission) => {
+    if (quitting) throw new Error('Desktop is shutting down')
+    const snapshot = permissions.query(permission)
+    // Host calls can reveal the native controls. Only an actual user click there may prompt the OS.
+    if (action === 'open-settings' || action === 'request' && snapshot.status !== 'granted' && (snapshot.canRequest || snapshot.canOpenSettings)) {
+      if (shellWindow && !shellWindow.isDestroyed() && shellWindow.webContents.getURL().endsWith('#permissions')) show(shellWindow)
+      else openControls('permissions')
+    }
+    return snapshot
+  },
 })
 const native = new NativeDesktop({ root, language: () => windowsLanguage, state, window: () => mainWindow,
   show: openMain, run, warn: error => runtime.diagnostics.append(String(error), 'warn') })
@@ -119,7 +129,7 @@ function createWindow(preload: string, primary = false): BrowserWindow {
   return window
 }
 
-function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' = 'general'): void {
+function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' = 'general'): void {
   if (quitting) return
   const url = `${SHELL_URL}?locale=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}&platform=${process.platform}&frame=${auxiliaryWindowHasCustomFrame()}#${page}`
   const resize = (window: BrowserWindow): void => {
@@ -164,7 +174,7 @@ async function command(value: unknown): Promise<void> {
   const type = input.type
   if (typeof type !== 'string') throw new Error('Invalid Next command')
   if (type === 'controls') {
-    if (input.page !== undefined && (typeof input.page !== 'string' || !['general', 'profiles', 'create-profile', 'tools', 'recovery'].includes(input.page))) throw new Error('Invalid controls page')
+    if (input.page !== undefined && (typeof input.page !== 'string' || !['general', 'profiles', 'create-profile', 'tools', 'recovery', 'permissions'].includes(input.page))) throw new Error('Invalid controls page')
     openControls(input.page as Parameters<typeof openControls>[0]); return
   }
   if (type === 'close-controls') { shellWindow?.close(); return }
