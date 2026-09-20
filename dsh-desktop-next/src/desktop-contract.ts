@@ -31,9 +31,10 @@ export const DEFAULT_PREFERENCES: Readonly<DesktopPreferences> = Object.freeze({
 export interface DesktopState {
   selected: string
   profiles: string[]
+  unavailableProfiles: string[]
   features: Features
   preferences: DesktopPreferences
-  phase: 'starting' | 'ready' | 'error'
+  phase: 'starting' | 'ready' | 'error' | 'recovery'
   busy: boolean
   failure: string
   safeMode: boolean
@@ -53,7 +54,8 @@ export type DesktopCommand =
   | { type: 'create' | 'switch' | 'delete'; name: string }
   | { type: 'features'; features: Features }
   | { type: 'preferences'; preferences: DesktopPreferences }
-  | { type: 'controls'; page?: 'general' | 'profiles' | 'recovery' }
+  | { type: 'controls'; page?: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' }
+  | { type: 'restart-app' | 'restart-recovery' }
   | { type: 'restart' | 'recover' | 'safe-mode' | 'normal-mode' | 'rollback' | 'repair-global'
     | 'reload' | 'devtools' | 'terminal' | 'open-home' | 'open-profile' | 'open-logs' | 'open-backups'
     | 'diagnostics' | 'open-browser' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }

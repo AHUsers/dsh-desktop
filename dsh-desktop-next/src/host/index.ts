@@ -10,6 +10,7 @@ import { bundledPnpmEntry } from '../extensions.ts'
 import { configureNextBrowserAccess } from '../desktop-browser-access.ts'
 import { parsePreferences } from '../desktop-preferences.ts'
 import { atomicJson } from '../private-files.ts'
+import type NextWebServer from '../webserver.ts'
 
 export async function main(): Promise<void> {
   const runtimeDir = process.argv[2]
@@ -55,6 +56,15 @@ export async function main(): Promise<void> {
   })()
   process.on('message', (value: unknown) => {
     if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'shutdown') void stop().catch(fatal)
+    if (typeof value !== 'object' || value === null || !('type' in value) || value.type !== 'browser-access') return
+    const request = value as { requestId?: unknown; enabled?: unknown }
+    if (!Number.isSafeInteger(request.requestId) || typeof request.enabled !== 'boolean') return
+    const enabled = request.enabled
+    void application.then(async ({ ctx }) => {
+      if (stopping) throw new Error('Next Host is stopping')
+      ;(ctx.webServer as NextWebServer).setBrowserAccess(enabled)
+      await send({ type: 'browser-access', requestId: request.requestId })
+    }).catch(async () => { await send({ type: 'browser-access', requestId: request.requestId, error: 'Could not update browser access' }) }).catch(fatal)
   })
   process.once('disconnect', () => { void stop().catch(fatal) })
   const { ctx } = await application

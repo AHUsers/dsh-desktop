@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { mountDesktopControls } from '../controls/view.ts'
 import { DESKTOP_CONTROLS_CSS } from '../controls/styles.ts'
 import { installWindowStyles } from './styles.ts'
+import { DesktopSettingsActions } from './settings-actions.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -45,6 +46,9 @@ export function apply(ctx: Context): void {
     ctx.slots.inject('settings.section', () => ctx.slots.register({
       name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'),
     }, DesktopSettings))
+    ctx.slots.inject('settings.action', () => ctx.slots.register({
+      name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next',
+    }, DesktopSettingsActions))
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))

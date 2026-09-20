@@ -25,8 +25,8 @@ export function parsePreferences(value: unknown): DesktopPreferences {
   return result as DesktopPreferences
 }
 
-export function networkChanged(previous: DesktopPreferences, next: DesktopPreferences): boolean {
-  return (['browserAccess', 'networkExposure', 'port', 'lanPort'] as const).some(key => previous[key] !== next[key])
+export function portsChanged(previous: DesktopPreferences, next: DesktopPreferences): boolean {
+  return (['port', 'lanPort'] as const).some(key => previous[key] !== next[key])
 }
 
 export class DesktopPreferenceStore {

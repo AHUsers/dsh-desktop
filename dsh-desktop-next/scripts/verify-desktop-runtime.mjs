@@ -15,7 +15,7 @@ const runtime = new NextDesktopRuntime({ root, home, executable: process.execPat
   certificate: async () => { throw new Error('This test must not request system key storage or expose a LAN listener') },
   onFailure: () => failures++, onChange() {}, onRestart() {}, onTerminal() {}, onNotification() {},
 })
-async function upgrade(origin, headers = {}) {
+async function upgrade(origin, headers = {}, keep = false) {
   return new Promise((resolve, reject) => {
     const request = requestHttp(new URL('/api/remote.mux', origin), { headers: {
       connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-version': '13',
@@ -23,7 +23,7 @@ async function upgrade(origin, headers = {}) {
     } })
     request.setTimeout(5000, () => request.destroy(new Error('WebSocket gate test timed out')))
     request.on('response', response => { response.resume(); resolve(response.statusCode) })
-    request.on('upgrade', (response, socket) => { socket.destroy(); resolve(response.statusCode) })
+    request.on('upgrade', (response, socket) => { socket.on('error', () => {}); if (keep) { socket.resume(); resolve(socket) } else { socket.destroy(); resolve(response.statusCode) } })
     request.on('error', reject)
     request.end()
   })
@@ -48,14 +48,50 @@ try {
   assert.equal(await upgrade(new URL(first.url).origin, { cookie: first.cookie }), 403, 'Disabled browser access also fences WebSocket upgrades')
   assert.equal(await upgrade(new URL(first.url).origin, { cookie: first.cookie, 'x-dsh-desktop-renderer': first.token }), 101, 'The native capability and cookie permit the real Gateway stream')
   assert.throws(() => runtime.browserLink(), /unavailable/)
-  await runtime.restart(() => runtime.writePreferences({ ...runtime.preferences, browserAccess: true }))
-  assert.notEqual(runtime.auth.token, first.token)
+  const nativeStream = await upgrade(new URL(first.url).origin, { cookie: first.cookie, 'x-dsh-desktop-renderer': first.token }, true)
+  await runtime.applyPreferences({ ...runtime.preferences, browserAccess: true })
+  assert.equal(runtime.auth, first, 'Browser toggles retain the existing Host and its capability')
   const login = await fetch(runtime.browserLink(), { redirect: 'manual' })
   assert.equal(login.status, 303, 'Enabled browser access exchanges the login token through the real Host')
   await login.body?.cancel()
+  const browserStream = await upgrade(new URL(first.url).origin, { cookie: first.cookie }, true)
+  const browserClosed = new Promise(resolve => browserStream.once('close', resolve))
+  await runtime.applyPreferences({ ...runtime.preferences, browserAccess: false, networkExposure: 'loopback' })
+  let closeTimer
+  try { await Promise.race([browserClosed, new Promise((_, reject) => { closeTimer = setTimeout(() => reject(new Error('Browser stream was not revoked')), 5000) })]) }
+  finally { clearTimeout(closeTimer); browserStream.destroy() }
+  assert.equal(nativeStream.destroyed, false, 'Withdrawing browser access must retain the native stream')
+  const denied = await fetch(new URL(first.url).origin, { headers: { cookie: first.cookie } })
+  assert.equal(denied.status, 403)
+  await denied.body?.cancel()
+  assert.equal(await upgrade(new URL(first.url).origin, { cookie: first.cookie }), 403)
+  assert.equal(runtime.state().browserUrl, null)
+  await runtime.applyPreferences({ ...runtime.preferences, browserAccess: true })
+  assert.equal(runtime.auth, first)
+  nativeStream.destroy()
+  await runtime.restart()
+  assert.notEqual(runtime.auth.token, first.token, 'An actual Host restart rotates the native capability')
   assert.equal(new URL(runtime.state().browserUrl).search, '')
   assert.equal(JSON.stringify(runtime.state()).includes(runtime.auth.token), false)
   assert.equal(JSON.stringify(runtime.state()).includes(new URL(runtime.auth.url).search), false)
+  // A slow certificate bootstrap leaves a live Host with its captured boot
+  // policy. A change made during startup must reach that Host after readiness.
+  let certificateStarted
+  let releaseCertificate
+  const preparingCertificate = new Promise(resolve => { certificateStarted = resolve })
+  const certificateGate = new Promise(resolve => { releaseCertificate = resolve })
+  runtime.options.certificate = async () => { certificateStarted(); await certificateGate; throw new Error('Fixture certificate unavailable') }
+  const starting = runtime.restart(() => runtime.writePreferences({ ...runtime.preferences, browserAccess: true, networkExposure: 'lan' }))
+  await preparingCertificate
+  let changedDuringStart = false
+  const changeDuringStart = runtime.applyPreferences({ ...runtime.preferences, browserAccess: false, networkExposure: 'loopback' }).then(() => { changedDuringStart = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(changedDuringStart, false, 'Changes made during startup wait for the captured Host policy')
+  releaseCertificate()
+  await Promise.all([starting, changeDuringStart])
+  const afterStartup = await fetch(new URL(runtime.auth.url).origin, { headers: { cookie: runtime.auth.cookie } })
+  assert.equal(afterStartup.status, 403, 'The running Host receives the preference saved while it was starting')
+  await afterStartup.body?.cancel()
   const dir = runtime.profiles.directory('default')
   await runtime.backend.stop()
   writeFileSync(join(dir, 'package.json'), '{ broken manifest')
@@ -81,7 +117,7 @@ try {
   const auth = runtime.auth
   await runtime.close()
   await assert.rejects(fetch(new URL(auth.url).origin))
-  console.log('Next Desktop runtime passed: native-only HTTP/WebSocket gate, browser enable/restart, per-Host credentials, corrupt-manifest recovery, isolated safe mode, separate global repair, and full process shutdown.')
+  console.log('Next Desktop runtime passed: native-only HTTP/WebSocket gate, hot browser enable/disable with existing browser-stream revocation and native-stream preservation, per-Host credentials, corrupt-manifest recovery, isolated safe mode, separate global repair, and full process shutdown.')
 } finally {
   await runtime.close()
   rmSync(home, { recursive: true, force: true })

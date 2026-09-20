@@ -30,6 +30,10 @@ server.listen(0, '127.0.0.1', () => {
   process.send({ type: 'ready', url: 'http://127.0.0.1:' + server.address().port + '/?token=fixture' })
 })
 process.on('message', message => {
+  if (message.type === 'browser-access') {
+    process.send({ type: 'browser-access', requestId: message.requestId, ...(message.enabled ? {} : { error: 'fixture rejection' }) })
+    return
+  }
   if (message.type === 'update-tasks') {
     process.send({ type: 'update-tasks', requestId: message.requestId, active: message.action === 'lock' })
     return
@@ -67,6 +71,16 @@ afterEach(async () => {
 })
 
 describe('desktop host process', () => {
+  it('correlates browser-policy acknowledgements and refuses stale or failed changes', async () => {
+    const host = hostProcess(projectWithHost())
+    await expect(host.setBrowserAccess(true)).rejects.toThrow('unavailable')
+    await host.start()
+    const results = await Promise.allSettled([host.setBrowserAccess(true), host.setBrowserAccess(false), host.setBrowserAccess(true)])
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
+    await host.stop()
+    await expect(host.setBrowserAccess(true)).rejects.toThrow('unavailable')
+  })
+
   it('correlates task inspections and admission changes over private IPC', async () => {
     const host = hostProcess(projectWithHost())
     await expect(host.updateTasks('inspect')).rejects.toThrow('Host is unavailable')

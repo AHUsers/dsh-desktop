@@ -5,10 +5,12 @@ import { markDocumentPlatform } from './preload-platform.ts'
 import { syncNativeTheme } from './preload-theme.ts'
 import { syncWindowsAppearance } from './preload-windows.ts'
 import { syncWindowMaterial } from './preload-material.ts'
+import { syncNativeLocale } from './preload-locale.ts'
 
 if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   markDocumentPlatform()
   syncNativeTheme()
+  syncNativeLocale()
   syncWindowsAppearance()
   syncWindowMaterial()
   contextBridge.exposeInMainWorld('desktopNext', {

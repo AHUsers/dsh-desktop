@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { DEFAULT_PREFERENCES, type DesktopState } from '../src/desktop-contract.ts'
-import { DesktopPreferenceStore, networkChanged, parsePreferences } from '../src/desktop-preferences.ts'
+import { DesktopPreferenceStore, portsChanged, parsePreferences } from '../src/desktop-preferences.ts'
 import { DesktopDiagnostics } from '../src/diagnostics.ts'
 import { NextProfiles, WEB_BUNDLES } from '../src/profiles.ts'
 import { NextRecovery } from '../src/recovery.ts'
@@ -20,8 +20,9 @@ it('keeps desktop preferences separate from the Host and validates all IPC-contr
   store.write({ ...DEFAULT_PREFERENCES, browserAccess: true, port: 3123, closeToTray: false })
   expect(new DesktopPreferenceStore(home).read()).toMatchObject({ browserAccess: true, port: 3123, closeToTray: false })
   for (const value of [{ port: -1 }, { port: '3000' }, { port: 1.1 }, { lanPort: 65536 }, { browserAccess: 'true' }, { windowsMaterial: 'invalid' }, { filename: '/tmp/escape' }]) expect(() => parsePreferences(value)).toThrow()
-  expect(networkChanged({ ...DEFAULT_PREFERENCES }, { ...DEFAULT_PREFERENCES, notifications: false })).toBe(false)
-  expect(networkChanged({ ...DEFAULT_PREFERENCES }, { ...DEFAULT_PREFERENCES, networkExposure: 'lan' })).toBe(true)
+  expect(portsChanged({ ...DEFAULT_PREFERENCES }, { ...DEFAULT_PREFERENCES, notifications: false })).toBe(false)
+  expect(portsChanged({ ...DEFAULT_PREFERENCES }, { ...DEFAULT_PREFERENCES, networkExposure: 'lan' })).toBe(false)
+  expect(portsChanged({ ...DEFAULT_PREFERENCES }, { ...DEFAULT_PREFERENCES, port: 3210 })).toBe(true)
 })
 
 it('backs up a malformed manifest, repairs without deleting data, and restores the last working config', async () => {
@@ -85,7 +86,7 @@ it('exports only bounded redacted diagnostics, including secrets split across ch
   log.hostChunk('Authorization: Bear')
   log.hostChunk('er private-token\nCookie: secret-cookie\n')
   log.append('debug information', 'debug')
-  const data = log.export({ version: 'next-dev', platform: 'test', selected: 'default', profiles: [], phase: 'error',
+  const data = log.export({ version: 'next-dev', platform: 'test', selected: 'default', profiles: [], unavailableProfiles: [], phase: 'error',
     safeMode: false, failure: 'token=private-token', features: { market: false, remoteControl: false }, preferences: { ...DEFAULT_PREFERENCES },
     trayAvailable: true, browserUrl: null, lan: null, busy: false, home, notificationsAvailable: true, windowsMicaSupported: false, checkpoint: null, logs: '' } satisfies DesktopState)
   expect(data).not.toContain('private-token')

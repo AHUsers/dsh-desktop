@@ -1,10 +1,35 @@
 /** Scoped controls styles shared by the official Settings contribution and recovery document. */
-export const DESKTOP_CONTROLS_CSS = `
+import { DESKTOP_SETTINGS_CSS } from './desktop-settings-styles.ts'
+export const DESKTOP_CONTROLS_CSS = DESKTOP_SETTINGS_CSS + `
 .dshNextSafeModeNotice{position:absolute;right:16px;bottom:16px;max-width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3);border-radius:10px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:12px/1.5 system-ui,sans-serif;pointer-events:auto;-webkit-app-region:no-drag}
 .dshNextSafeModeNotice p{margin:5px 0 8px}.dshNextSafeModeNotice button{font:inherit;border:1px solid currentColor;border-radius:5px;padding:4px 8px;background:transparent;color:inherit;cursor:pointer}
 .dshNextStandalone{margin:0;color-scheme:light dark;background:Canvas;color:CanvasText;font:14px/1.6 system-ui,sans-serif}
 .dshNextStandalone main{max-width:800px;margin:auto;padding:28px}
+.dshNextStandalone{--dsw-alias-label-primary:CanvasText;--dsw-alias-label-secondary:color-mix(in srgb,CanvasText 65%,Canvas);--dsw-alias-label-primary-foreground:Canvas;--dsw-alias-bg-layer-1:Canvas;--dsw-alias-bg-layer-2:color-mix(in srgb,CanvasText 7%,Canvas);--dsw-alias-border-l1:color-mix(in srgb,CanvasText 15%,Canvas);--dsw-alias-border-l2:color-mix(in srgb,CanvasText 25%,Canvas);--dsw-alias-interactive-bg-hover:color-mix(in srgb,CanvasText 8%,Canvas);--dsw-alias-brand-primary:#5987d9;--dsw-alias-state-error-primary:#d83b3b}
 .dshNextSettings{font:14px/1.55 system-ui,sans-serif;color:inherit;min-width:0;padding-bottom:16px}
+.dshNextSettings .dshDesktopSettingsGroup{margin-top:24px}.dshNextSettings .dshDesktopSettingsGroup h3{margin:0}
+.dshNextSettings .dshDesktopSettingsGroupIntro{margin:4px 0 0}.dshNextSettings .dshDesktopSettingsChoice{border-radius:10px;padding:13px 14px}
+.dshNextSettings .dshDesktopSettingsChoiceTitle{margin:0}.dshNextSettings .dshDesktopSettingsChoiceBody{margin-top:3px}
+.dshNextSettings .nextProfile{display:flex;align-items:center;gap:10px}.dshNextSettings .nextProfile>button:first-child{flex:1}
+.dshNextSettings .nextProfile [data-command=delete]{flex-shrink:0;color:var(--dsw-alias-state-error-primary)}
+.dshNextSettings .dshDesktopSettingsForm{margin:0;align-items:flex-end}.dshNextSettings .dshDesktopSettingsField{margin:0;align-items:stretch;justify-content:flex-start}
+.dshNextSettings .dshDesktopSettingsField input{width:100%;max-width:none}.dshNextSettings button[aria-checked=true]:disabled{opacity:1}
+.dshNextSettings .dshDesktopSettingsChoiceCopy{display:block;text-align:left}
+.dshNextSettings .nextSwitch{width:36px;height:20px;appearance:none;border:0;border-radius:99px;padding:2px;background:var(--dsw-alias-border-l2);cursor:pointer;flex-shrink:0;transition:background .15s}
+.dshNextSettings .nextSwitch:before{content:'';display:block;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-label-primary-foreground);box-shadow:0 1px 2px #0003;transition:transform .15s}
+.dshNextSettings .nextSwitch:checked{background:var(--dsw-alias-brand-primary)}.dshNextSettings .nextSwitch:checked:before{transform:translateX(16px)}
+.dshNextSettings .nextSwitch:disabled{opacity:.45;cursor:default}.dshNextSettings .dshDesktopSettingsToggleRow{margin:0}
+.dshNextSettings .nextPorts{display:flex;gap:12px;flex-wrap:wrap}.dshNextSettings .nextPorts label{flex:1;min-width:170px;flex-direction:column;align-items:flex-start;gap:6px;font-size:12px}
+.dshNextSettings .nextPorts label input{width:100%}.dshNextSettings .nextPorts button{align-self:flex-end;margin-bottom:12px}.dshNextSettings .nextFeatureChoices{display:grid;gap:8px}
+.dshNextSettings input:disabled,.dshNextSettings select:disabled{opacity:.55}
+.dshNextSettings[data-presentation=settings]>nav,.dshNextSettings[data-presentation=settings]>details{display:none}
+.dshNextSettings [data-feature][aria-checked=true]{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
+.dshNextSettings .nextRow [data-command]{border-radius:999px;font-size:12px}
+.dshNextSettings [data-saved]{color:var(--dsw-alias-label-secondary);font-size:12px}
+.dshNextNativeActions{position:relative}.dshNextNativeActions [hidden]{display:none!important}
+.dshNextNativeActions .dshDesktopActionMenu{top:calc(100% + 6px)!important;right:0}
+.dshNextNativeActions .dshDesktopSettingsHeaderButton{white-space:nowrap}
+@media(max-width:720px){.dshNextSettings .nextProfile{align-items:stretch;flex-direction:column}.dshNextNativeActions{gap:4px!important}}
 .dshNextSettings *{box-sizing:border-box}.dshNextSettings [hidden]{display:none!important}
 .dshNextSettings h2{font-size:23px;font-weight:650;margin:0 0 8px}.dshNextSettings h3{font-size:15px;font-weight:600;margin:24px 0 12px}
 .dshNextSettings p{margin:8px 0 14px}.dshNextSettings .nextEyebrow{font-size:10px;letter-spacing:.12em;opacity:.55;margin:0 0 5px}
