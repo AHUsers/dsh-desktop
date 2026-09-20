@@ -2,7 +2,8 @@
 import { createElement, useEffect, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -55,7 +56,8 @@ export function apply(ctx: Context): void {
     const t = ctx.locale.bind('desktop-next')
     // The shared settings shell maps the legacy section ID to our display icon.
     ctx.slots.inject('settings.section', () => ctx.slots.register({
-      name: 'settings.section', id: 'desktop', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),
+      name: 'settings.section', id: 'desktop', order: 100, locale: 'desktop-next', label: () => t('settings'),
+      inject: () => ({ adapter, openPlugins: () => ctx.layout.selectPanel('plugins' as MainPanelId) }),
     }, DesktopSettings))
     ctx.slots.inject('settings.action', () => ctx.slots.register({
       name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next', inject: () => ({ adapter }),
@@ -87,8 +89,8 @@ function SafeModeNotice({ t }: PropsLocale<'desktop-next'>) {
   ) : null
 }
 
-function DesktopSettings({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
-  return createElement(NextDesktopSettings, { adapter, language: t('language') })
+function DesktopSettings({ t, adapter, close, openPlugins }: PropsLocale<'desktop-next'> & PropsRuntime<'settings.section'> & { adapter: NextSettingsAdapter; openPlugins(): void }) {
+  return createElement(NextDesktopSettings, { adapter, language: t('language'), onOpenPlugins: () => { openPlugins(); close() } })
 }
 
 function SettingsActions({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {

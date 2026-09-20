@@ -10,6 +10,9 @@ const STYLES = `
 .dshNextPluginActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dshNextPluginHeading > .dshNextPluginActions { flex-wrap: nowrap; flex-shrink: 0; }
 button.dshNextSettingsGear { width: 28px; padding: 0; }
+.dshNextPluginSettingsNotice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; border: 1px solid var(--dsw-alias-border-l1); }
+.dshNextPluginSettingsNotice > span { flex: 1 1 220px; }
+.dshNextPluginSettingsNotice > button { flex-shrink: 0; }
 .dshNextPluginControls p { margin: 0; }
 .dshNextPermissionsDialog { width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
 .dshNextPermissionList { display: grid; gap: 0; }

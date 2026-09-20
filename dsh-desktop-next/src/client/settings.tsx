@@ -1,5 +1,6 @@
 /** Mount the existing Desktop page and controls against Next's native adapter. */
 import { useState } from 'react'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DesktopSettingsSection, DesktopSettingsToggleRow } from '../../../dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx'
 import { DesktopNativeActions } from '../../../dsh-plugin-desktop-beta/src/client/DesktopNativeActions.tsx'
 import { en, zh, type DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
@@ -20,7 +21,7 @@ export function desktopTranslate(language: string): (key: string) => string {
   }
 }
 
-export function NextDesktopSettings({ adapter, language }: { adapter: NextSettingsAdapter; language: string }) {
+export function NextDesktopSettings({ adapter, language, onOpenPlugins }: { adapter: NextSettingsAdapter; language: string; onOpenPlugins(): void }) {
   const state = useDesktopState(adapter)
   const t = desktopTranslate(language)
   return <div data-next-desktop-settings=""><DesktopSettingsSection
@@ -29,6 +30,10 @@ export function NextDesktopSettings({ adapter, language }: { adapter: NextSettin
     setMode={async () => { throw new Error('Window modes are not supported in Next') }}
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
     capabilities={{ windowModes: false, pluginSelectors: false, materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
+    introNotice={<div className="dshDesktopSettingsNotice dshNextPluginSettingsNotice" data-next-plugin-settings-notice>
+      <span>{language.startsWith('zh') ? '插件市场和远程控制设置已移至插件页面。' : 'Plugin market and remote control settings have moved to the Plugins page.'}</span>
+      <Button variant="outline" size="sm" onClick={onOpenPlugins}>{language.startsWith('zh') ? '前往插件页面' : 'Go to Plugins'}</Button>
+    </div>}
     browserActions={state && <NextBrowserActions adapter={adapter} state={state} language={language} />}
     extraSections={<>
       {adapter.bridge.permissions && <DesktopPermissionsSection service={adapter.bridge.permissions} language={language} />}
