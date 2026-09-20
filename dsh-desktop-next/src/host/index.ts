@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { loadNextProfile, NEXT_PACKAGE } from '../profiles.ts'
 import { bundledPnpmEntry } from '../extensions.ts'
+import { withDesktopPnpmPolicy } from '../pnpm-policy.ts'
 import { configureNextBrowserAccess } from '../desktop-browser-access.ts'
 import { parsePreferences } from '../desktop-preferences.ts'
 import { atomicJson } from '../private-files.ts'
@@ -35,7 +36,7 @@ export async function main(): Promise<void> {
     resolutionMode: 'runtime', resolvedProfile: { profile, installAnchor: NEXT_PACKAGE },
     patchFiles: [join(runtimeDir, 'host.cordis.patch.yml'), join(projectDir, 'desktop-next.cordis.patch.json'), runtimePatch], args: ['--no-open', '--port', String(preferences.port)],
     packageManager: {
-      command: process.execPath, args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE)],
+      command: process.execPath, args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE), ...withDesktopPnpmPolicy([])],
       env: {
         DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
         ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {}),

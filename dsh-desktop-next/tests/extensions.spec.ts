@@ -2,6 +2,7 @@ import { once } from 'node:events'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it } from 'vitest'
 import { createPackageRunner } from '../src/extensions.ts'
+import { PNPM_IGNORE_MINIMUM_RELEASE_AGE } from '../src/pnpm-policy.ts'
 
 const runners: ReturnType<typeof createPackageRunner>[] = []
 function runner() {
@@ -16,6 +17,21 @@ function runner() {
   return result
 }
 afterEach(async () => { await Promise.all(runners.splice(0).map(value => value.dispose())) })
+
+it.each([[false, false], [true, false], [false, true], [true, true]])(
+  'passes the Desktop policy once with invocation=%s and caller=%s', async (invocationPolicy, callerPolicy) => {
+    const manager = createPackageRunner({ command: process.execPath, env: {},
+      args: ['-e', 'process.stdout.write(JSON.stringify(process.argv.slice(1)))', '--',
+        ...(invocationPolicy ? [PNPM_IGNORE_MINIMUM_RELEASE_AGE] : [])],
+    }, tmpdir())
+    runners.push(manager)
+    const operation = manager.run([...(callerPolicy ? [PNPM_IGNORE_MINIMUM_RELEASE_AGE] : []), 'remove', 'fixture'])
+    let output = ''
+    operation.stdout.on('data', chunk => { output += chunk })
+    expect((await operation.done).exitCode).toBe(0)
+    expect(JSON.parse(output)).toEqual(['remove', 'fixture', PNPM_IGNORE_MINIMUM_RELEASE_AGE])
+  },
+)
 
 it('does not let cancellation of a completed operation kill its successor', async () => {
   const manager = runner()

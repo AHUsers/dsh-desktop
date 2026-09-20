@@ -9,6 +9,7 @@ import { DesktopHostProcess } from '../lib/host-process.js'
 import { NEXT_PACKAGE, NextProfiles } from '../lib/profiles.js'
 import { bundledPnpmEntry, createPackageRunner } from '../lib/extensions.js'
 import { forwardWebRequest } from '../lib/web-document.js'
+import { startRecentRegistry } from './fixtures/recent-registry.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const home = mkdtempSync(join(tmpdir(), 'dsh-next-host-'))
@@ -17,6 +18,11 @@ const executable = process.argv.includes('--electron') ? createRequire(import.me
 let restartRequests = 0
 let host
 let runner
+let registry
+const pnpmInvocation = { command: executable, args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE)], env: {
+  ELECTRON_RUN_AS_NODE: '1', DSH_DESKTOP_NODE_EXECUTABLE: executable,
+  PATH: `${join(root, 'scripts', 'node-bin')}${delimiter}${process.env.PATH ?? ''}`,
+} }
 async function boot(name) {
   host = new DesktopHostProcess(executable, root, manager.directory(name), undefined,
     { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' }, undefined, undefined, 'runtime', undefined,
@@ -39,16 +45,14 @@ async function boot(name) {
 async function stop() { await host.stop(true); host = undefined }
 try {
   const dir = manager.ensure('default')
+  writeFileSync(join(dir, 'pnpm-workspace.yaml'), `storeDir: ${JSON.stringify(join(home, 'store'))}\n`)
   manager.setFeatures('default', { remoteControl: true, market: true, dshMarket: true })
   // Install only a local empty fixture. No catalog, registry or user profile is changed.
   const fixture = join(home, 'fixture-plugin')
   mkdirSync(fixture)
   writeFileSync(join(fixture, 'package.json'), JSON.stringify({ name: 'fixture-next-plugin', version: '1.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
   writeFileSync(join(fixture, 'cordis.patch.yml'), '[]\n')
-  runner = createPackageRunner({ command: executable, args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE)], env: {
-    ELECTRON_RUN_AS_NODE: '1', DSH_DESKTOP_NODE_EXECUTABLE: executable,
-    PATH: `${join(root, 'scripts', 'node-bin')}${delimiter}${process.env.PATH ?? ''}`,
-  } }, dir)
+  runner = createPackageRunner(pnpmInvocation, dir)
   const { createDesktopPluginRuntime } = await import(new URL('./lib/dsh-cli.js', pathToFileURL(createRequire(import.meta.url).resolve('dshmarket/package.json'))))
   const marketRuntime = createDesktopPluginRuntime(runner, dir, home)
   const installed = await marketRuntime.runPlugin('default', ['add', '--offline', '--ignore-scripts', `file:${fixture}`])
@@ -177,9 +181,29 @@ try {
   assert.ok((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin' && row.installed && row.enabled && row.removable))
   await rpc('setBundleEnabled', { name: 'fixture-next-plugin', enabled: false })
   assert.equal((await rpc('listBundles')).find(row => row.name === 'fixture-next-plugin')?.enabled, false)
+  // A market can install a new release before the official manager removes a different plugin.
+  // Keep that release in the lockfile to exercise pnpm's verification, not just resolution.
+  registry = await startRecentRegistry(home, executable, bundledPnpmEntry(NEXT_PACKAGE))
+  writeFileSync(join(dir, '.npmrc'), `@dsh-next-fixture:registry=${registry.origin}\n`)
+  const policyFile = join(dir, 'pnpm-workspace.yaml')
+  const policy = `minimumReleaseAge: 1440\nstoreDir: ${JSON.stringify(join(home, 'store'))}\n`
+  writeFileSync(policyFile, policy)
+  runner = createPackageRunner(pnpmInvocation, dir)
+  const recent = await createDesktopPluginRuntime(runner, dir, home)
+    .runPlugin('default', ['add', '--ignore-scripts', '--save-exact', `${registry.name}@${registry.version}`])
+  assert.equal(recent.exitCode, 0, JSON.stringify(recent))
   const uninstalled = await rpc('removeBundle', { name: 'fixture-next-plugin' })
   assert.equal(uninstalled.application, 'applied', JSON.stringify(uninstalled))
   assert.equal((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin'), false)
+  const withRecentDependency = await rpc('installBundle', { spec: fixture })
+  assert.equal(withRecentDependency.application, 'applied', JSON.stringify(withRecentDependency))
+  const removedAgain = await rpc('removeBundle', { name: 'fixture-next-plugin' })
+  assert.equal(removedAgain.application, 'applied', JSON.stringify(removedAgain))
+  assert.equal(readFileSync(policyFile, 'utf8'), policy, 'Desktop policy must not rewrite Profile configuration')
+  const finalManifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  assert.equal(finalManifest.dependencies[registry.name], registry.version)
+  assert.equal(finalManifest.dsh.profile.bundles.includes('fixture-next-plugin'), false)
+  await runner.dispose()
   await stop()
   writeFileSync(join(dir, 'cordis.patch.yml'), ': broken: [yaml')
   await manager.recover('default')
@@ -219,9 +243,10 @@ try {
     await stop()
     console.log('Opt-in Cua native provider activation and teardown passed without capturing screens, sending input or prompting for OS permissions.')
   }
-  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, both markets and AA independently managed and persisted, official row toggles, dshmarket offline install and cross-market removal, native dshmarket update origin gate, graceful shutdown, recovery boot and profile switch.`)
+  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, both markets and AA independently managed and persisted, official row toggles, dshmarket offline install and cross-market removal, official install/remove with a freshly published locked dependency, native dshmarket update origin gate, graceful shutdown, recovery boot and profile switch.`)
 } finally {
   await runner?.dispose()
   await host?.stop()
+  await registry?.stop()
   rmSync(home, { recursive: true, force: true })
 }
