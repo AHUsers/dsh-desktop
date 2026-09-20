@@ -34,7 +34,7 @@ corepack yarn workspace dsh-desktop-next exec playwright install chromium
 corepack yarn workspace dsh-desktop-next verify:window-controls
 ```
 
-设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。版本限定的包补丁让无会话首页复用官方会话顶栏框架，并让首页和插件页复用官方侧栏控件。插件页保留原有标题、操作栏、布局与滚动行为。在不滚动的主栏顶部设置 52px 高的透明拖动区域，覆盖顶部及两侧留白，不占布局空间、不遮挡内容。按钮、链接、输入框等交互控件排除原生拖动，滚入该区域后仍可点击。
+设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。版本限定的包补丁让无会话首页复用官方会话顶栏框架及侧栏控件。在插件列表和详情页收起侧栏后，复用官方展开按钮，固定在 macOS 红黄绿按钮右侧，位置不受内容宽度和页面滚动影响，不额外显示会话页的“新会话”按钮。插件页保留原有标题、操作栏、布局与滚动行为。在不滚动的主栏顶部设置 52px 高的透明拖动区域，覆盖顶部及两侧留白，不占布局空间、不遮挡内容。按钮、链接、输入框等交互控件排除原生拖动，滚入该区域后仍可点击。
 
 ## 应用图标资源
 
