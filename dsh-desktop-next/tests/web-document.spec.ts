@@ -2,9 +2,17 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authenticateWebHost, forwardWebRequest, serveWebDocument } from '../src/web-document.ts'
+import type { WebContents } from 'electron'
+import { appRequestHeaders, authenticateWebHost, forwardWebRequest, serveWebDocument } from '../src/web-document.ts'
+import { NATIVE_ACCESS_HEADER } from '../src/desktop-contract.ts'
 
 const roots: string[] = []
+const NATIVE_TOKEN = 'native-token'
+function ownedRequest(url: string, init?: RequestInit): Request {
+  const request = new Request(url, init)
+  request.headers.set(NATIVE_ACCESS_HEADER, NATIVE_TOKEN)
+  return request
+}
 afterEach(async () => {
   vi.unstubAllGlobals()
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
@@ -39,10 +47,10 @@ it('forwards upload bytes and cancellation with Host credentials while keeping t
   const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('stream')); controller.close() } })
   const fetch = vi.fn().mockResolvedValue(new Response(body, { headers: { 'content-encoding': 'gzip', 'set-cookie': 'private' } }))
   vi.stubGlobal('fetch', fetch)
-  const request = new Request('dsh-app://app/api/upload?name=file', {
+  const request = ownedRequest('dsh-app://app/api/upload?name=file', {
     method: 'POST', body: 'upload bytes', headers: { origin: 'dsh-app://app', cookie: 'untrusted' },
   })
-  const response = await forwardWebRequest(request, 'http://127.0.0.1:1234/?token=secret', 'session=owned')
+  const response = await forwardWebRequest(request, 'http://127.0.0.1:1234/?token=secret', 'session=owned', NATIVE_TOKEN)
   const [target, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit]
   expect(target.href).toBe('http://127.0.0.1:1234/api/upload?name=file')
   expect(new Headers(init.headers).get('cookie')).toBe('session=owned')
@@ -57,20 +65,94 @@ it('forwards upload bytes and cancellation with Host credentials while keeping t
 it('refuses another page origin without forwarding its request', async () => {
   const fetch = vi.fn()
   vi.stubGlobal('fetch', fetch)
-  const response = await forwardWebRequest(new Request('dsh-app://app/api/read', { headers: { origin: 'https://other.example' } }), 'http://127.0.0.1:1234/', 'session=owned')
+  const request = ownedRequest('dsh-app://app/api/read', { headers: { origin: 'https://other.example' } })
+  const response = await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)
   expect(response.status).toBe(403)
   expect(fetch).not.toHaveBeenCalled()
+})
+
+it.each(['sources', 'operations/preview', 'operations/execute'])('forwards native Market %s without an Origin header', async path => {
+  const fetch = vi.fn().mockResolvedValue(new Response('{}'))
+  vi.stubGlobal('fetch', fetch)
+  // The main-process network hook supplies the marker even when Origin is absent.
+  const request = ownedRequest(`dsh-app://app/api/community-market/${path}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  })
+  const response = await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)
+  expect(response.status).toBe(200)
+  const headers = new Headers(fetch.mock.calls[0]![1].headers)
+  expect(headers.get('origin')).toBe('http://127.0.0.1:1234')
+  expect(headers.get('sec-fetch-site')).toBe('same-origin')
+  expect(headers.get('cookie')).toBe('session=owned')
+  expect(headers.get('x-dsh-desktop-renderer')).toBe('native-token')
 })
 
 it('preserves Market mutation authority only for the owned application origin', async () => {
   const fetch = vi.fn().mockResolvedValue(new Response('{}'))
   vi.stubGlobal('fetch', fetch)
   const url = 'dsh-app://app/api/community-market/operations/preview'
-  expect((await forwardWebRequest(new Request(url, { method: 'POST', body: '{}' }), 'http://127.0.0.1:1234/', 'session=owned')).status).toBe(403)
+  expect((await forwardWebRequest(new Request(url, { method: 'POST', body: '{}' }), 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)).status).toBe(403)
   expect(fetch).not.toHaveBeenCalled()
-  await forwardWebRequest(new Request(url, { method: 'POST', headers: { origin: 'dsh-app://app' }, body: '{}' }), 'http://127.0.0.1:1234/', 'session=owned')
+  const request = ownedRequest(url, { method: 'POST', headers: { origin: 'dsh-app://app' }, body: '{}' })
+  await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)
   const headers = new Headers(fetch.mock.calls[0]![1].headers)
   expect(headers.get('origin')).toBe('http://127.0.0.1:1234')
   expect(headers.get('sec-fetch-site')).toBe('same-origin')
   expect(headers.get('cookie')).toBe('session=owned')
 })
+
+it.each([undefined, 'wrong-token'])(
+  'rejects native marker %s even with app-looking headers and referrer', async marker => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const request = new Request('dsh-app://app/api/community-market/sources', {
+      method: 'POST', body: '{}', referrer: 'dsh-app://app/',
+      headers: { origin: 'dsh-app://app', 'sec-fetch-site': 'same-origin' },
+    })
+    if (marker) request.headers.set(NATIVE_ACCESS_HEADER, marker)
+    expect((await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)).status).toBe(403)
+    expect(fetch).not.toHaveBeenCalled()
+  },
+)
+
+it.each(['dsh-app://shell/api/read', 'dsh-app://app:1234/api/read', 'https://app/api/read'])(
+  'does not forward credentials for another request authority: %s', async url => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const request = ownedRequest(url)
+    expect((await forwardWebRequest(request, 'http://127.0.0.1:1234/', 'session=owned', NATIVE_TOKEN)).status).toBe(403)
+    expect(fetch).not.toHaveBeenCalled()
+  },
+)
+
+it('marks only owned main-frame requests and strips caller markers from every other target', () => {
+  const frame = { origin: 'dsh-app://app', detached: false } as WebContents['mainFrame']
+  const owner = { id: 7, mainFrame: frame }
+  const request = { url: 'dsh-app://app/api/community-market/sources', webContentsId: owner.id,
+    frame, resourceType: 'xhr' as const, requestHeaders: { 'X-Dsh-Desktop-Renderer': 'caller', 'content-type': 'application/json' } }
+  const headers = appRequestHeaders(request, owner, NATIVE_TOKEN)
+  expect(headers).toEqual({ 'content-type': 'application/json', [NATIVE_ACCESS_HEADER]: NATIVE_TOKEN })
+  const refused = [
+    { ...request, webContentsId: 8 },
+    { ...request, frame: null },
+    { ...request, frame: { ...frame } as WebContents['mainFrame'] },
+    { ...request, resourceType: 'mainFrame' as const },
+    { ...request, url: 'dsh-app://shell/api/test' },
+    { ...request, url: 'dsh-app://app:1234/api/test' },
+    { ...request, url: 'https://other.example/redirected' },
+    { ...request, url: 'http://127.0.0.1:1234/api/test' },
+  ]
+  for (const input of refused) expect(new Headers(appRequestHeaders(input, owner, NATIVE_TOKEN)).get(NATIVE_ACCESS_HEADER)).toBeNull()
+  expect(new Headers(appRequestHeaders(request, undefined, NATIVE_TOKEN)).get(NATIVE_ACCESS_HEADER)).toBeNull()
+  expect(new Headers(appRequestHeaders(request, owner, undefined)).get(NATIVE_ACCESS_HEADER)).toBeNull()
+})
+
+it.each(['null', 'https://other.example', 'dsh-app://shell', 'dsh-app://app.evil', 'dsh-app://app:1234'])(
+  'does not trust main-frame origin %s', origin => {
+    const frame = { origin, detached: false } as WebContents['mainFrame']
+    const owner = { id: 7, mainFrame: frame }
+    const headers = appRequestHeaders({ url: 'dsh-app://app/api/community-market/sources', webContentsId: owner.id,
+      frame, resourceType: 'xhr', requestHeaders: { [NATIVE_ACCESS_HEADER]: NATIVE_TOKEN, origin: 'dsh-app://app' } }, owner, NATIVE_TOKEN)
+    expect(new Headers(headers).get(NATIVE_ACCESS_HEADER)).toBeNull()
+  },
+)

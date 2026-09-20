@@ -5,7 +5,7 @@ import { writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, Notification, protocol, safeStorage, session, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
-import { forwardWebRequest, serveWebDocument } from './web-document.ts'
+import { appRequestHeaders, forwardWebRequest, serveWebDocument } from './web-document.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { NEXT_PACKAGE, parseFeatures, profileName } from './profiles.ts'
 import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
@@ -302,12 +302,16 @@ async function main(): Promise<void> {
       .then(result => result.canceled ? null : result.filePaths[0] ?? null).finally(() => { picking = undefined })
     return picking
   })
-  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['ws://127.0.0.1/*'] }, (details, callback) => {
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['<all_urls>'] }, (details, callback) => {
     const auth = runtime.auth
-    if (!auth || details.webContentsId !== mainWindow?.webContents.id) return callback({})
+    const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : undefined
+    const requestHeaders = appRequestHeaders(details, owner, auth?.token)
+    const target = new URL(details.url)
+    if (target.protocol !== 'ws:' || target.hostname !== '127.0.0.1'
+      || !auth || details.webContentsId !== owner?.id) return callback({ requestHeaders })
     const host = new URL(auth.url)
-    if (new URL(details.url).host !== host.host) return callback({})
-    const headers = Object.fromEntries(Object.entries(details.requestHeaders).map(([key, value]) => [key.toLowerCase(), value]))
+    if (target.host !== host.host) return callback({ requestHeaders })
+    const headers = Object.fromEntries(Object.entries(requestHeaders).map(([key, value]) => [key.toLowerCase(), value]))
     if (headers.origin !== 'dsh-app://app') return callback({ cancel: true })
     callback({ requestHeaders: { ...headers, origin: host.origin, cookie: auth.cookie, [NATIVE_ACCESS_HEADER]: auth.token, 'sec-fetch-site': 'same-origin' } })
   })

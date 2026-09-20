@@ -113,6 +113,9 @@ jobs:
       - name: Verify Next window controls in the official frontend
         if: needs.changes.outputs.product == 'true'
         run: yarn workspace dsh-desktop-next verify:window-controls
+      - name: Verify Next native protocol mutations in Electron
+        if: needs.changes.outputs.product == 'true'
+        run: xvfb-run --auto-servernum yarn workspace dsh-desktop-next verify:protocol --no-sandbox
 
   # Windows-only logic and unsigned NSIS/portable builds on a real Windows runner:
   # updates, window options, pwsh sandbox, volume diagnostics, and packaging.

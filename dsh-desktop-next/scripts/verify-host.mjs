@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { DesktopHostProcess } from '../lib/host-process.js'
 import { NEXT_PACKAGE, NextProfiles } from '../lib/profiles.js'
 import { bundledPnpmEntry, createPackageRunner } from '../lib/extensions.js'
+import { forwardWebRequest } from '../lib/web-document.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const home = mkdtempSync(join(tmpdir(), 'dsh-next-host-'))
@@ -64,16 +65,28 @@ try {
   const stateBody = await state.json()
   assert.ok(Array.isArray(stateBody.sources))
   assert.deepEqual(stateBody.desktopActions, { openTerminal: ['darwin', 'win32'].includes(process.platform), requestRestart: true })
+  const nativeToken = 'fixture-native-request'
   const call = async (path, body, expected = 200) => {
-    const response = await fetch(`${origin}/api/community-market/${path}`, {
+    // Match the native session marker, including an absent Origin header.
+    const request = new Request(`dsh-app://app/api/community-market/${path}`, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: { cookie, origin, 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-dsh-desktop-renderer': nativeToken },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
+    const response = await forwardWebRequest(request, origin, cookie, nativeToken)
     const result = await response.json()
     assert.equal(response.status, expected, JSON.stringify(result))
     return result
   }
+  const builtIn = stateBody.builtIns[0]
+  assert.ok(builtIn)
+  const added = await call('sources', { action: 'add-builtin', key: builtIn.key })
+  const source = added.sources.find(item => item.builtInProviderKey === builtIn.key)
+  assert.ok(source)
+  const selected = await call('sources', { action: 'select', sourceRecordId: source.sourceRecordId })
+  assert.equal(selected.sources.find(item => item.sourceRecordId === source.sourceRecordId)?.enabled, true)
+  const deleted = await call('sources', { action: 'remove', sourceRecordId: source.sourceRecordId })
+  assert.equal(deleted.sources.some(item => item.sourceRecordId === source.sourceRecordId), false)
   assert.ok((await call('installations')).installations.some(item => item.packageName === 'fixture-next-plugin' && item.action === 'uninstall'))
   // This invalid mutation must reach the existing schema gate, with no installation or external requests.
   const mutation = await fetch(`${origin}/api/community-market/operations/preview`, {
@@ -119,7 +132,7 @@ try {
   assert.equal(switchedState.status, 200)
   await switchedState.body?.cancel()
   await stop()
-  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, AA composition, offline pnpm, Market uninstall/restart, graceful shutdown, recovery boot and profile switch.`)
+  console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, AA composition, offline pnpm, native Market sources/uninstall/restart without Origin, graceful shutdown, recovery boot and profile switch.`)
 } finally {
   await runner?.dispose()
   await host?.stop()

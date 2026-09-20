@@ -25,6 +25,8 @@ corepack yarn workspace dsh-desktop-next verify:host:electron
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
+CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack yarn workspace dsh-desktop-next verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check:next` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
+
 macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中运行官方前端的 Desktop 启动分支。测试使用与 Next 相同的入口文档，通过模拟的 preload 接口提供真实 Host 注入，并断言已进入 Desktop 传输模式；随后验证首页和插件页收起后重新展开侧栏、拖动区域的位置，以及页面按钮可正常点击。测试还会打开官方设置中的“桌面”分区，验证设置和 Profile 操作，并在没有 Host 依赖时渲染独立恢复窗口的实际构建产物。这些浏览器检查使用模拟的原生 IPC。构建后，首次安装测试浏览器并运行：
 
 ```sh
@@ -78,7 +80,7 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
               └─ Agents Anywhere bridge
 ```
 
-alpha.1 的无端口管道方案已被 alpha.2 的 WebServer 方案替代。本包使用真正的上游 WebServer，不实现模拟 HTTP 路由层。Host 仅绑定 `127.0.0.1`，默认由系统分配端口，以便与其他版本并行运行；可选的独立 TLS 入口负责局域网访问。主进程保管 Host cookie 和每次启动新生成的原生访问凭据。关闭浏览器访问时，普通 HTTP 和 WebSocket 请求都会被拒绝。市场请求还需通过 Host 认证，写请求继续接受来源检查。
+alpha.1 的无端口管道方案已被 alpha.2 的 WebServer 方案替代。本包使用真正的上游 WebServer，不实现模拟 HTTP 路由层。Host 仅绑定 `127.0.0.1`，默认由系统分配端口，以便与其他版本并行运行；可选的独立 TLS 入口负责局域网访问。主进程保管 Host cookie 和每次启动新生成的原生访问凭据。关闭浏览器访问时，普通 HTTP 和 WebSocket 请求都会被拒绝。Electron 保持在 44.0.0，以兼容上游原生模块。转发到 Host 前，主进程只为自有主窗口中来源为 `dsh-app://app` 的主 frame 请求附加原生访问凭据，并从其他目标及重定向请求中移除该标记；原生 fetch 可以不带 HTTP `Origin` 头。市场请求还需通过 Host 认证，写请求继续校验转换后的本机 HTTP 来源。
 
 主界面使用官方前端产物，不复制聊天、设置或插件管理页面。macOS 窗口材质、平台标记、Windows 标题栏菜单与主题同步参考官方实现。Next 通过官方的 `settings.section` 槽位添加“桌面”分区，通过 `settings.action` 添加顶部快捷操作。桌面分区直接复用 `dsh-plugin-desktop-beta` 的 `DesktopSettingsSection`、顶部操作和样式；恢复与 Profile 窗口复用原有 React 页面、窗口标题区和基础组件。Next 只适配状态与操作接口，并按能力隐藏未支持的功能，不维护另一套页面副本。共享组件改动同步到 Stable，保留两个版本原有的默认行为。经过发送者校验的窄 IPC 接口只提供预定义的原生操作，普通浏览器不会获得原生 Desktop 接口。
 

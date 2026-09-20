@@ -1,6 +1,7 @@
 /** Local Web document and authenticated HTTP forwarding for the application window. */
 import { readFile } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
+import type { OnBeforeSendHeadersListenerDetails, WebContents } from 'electron'
 import { NATIVE_ACCESS_HEADER } from './desktop-contract.ts'
 
 const MIME: Readonly<Record<string, string>> = {
@@ -9,6 +10,22 @@ const MIME: Readonly<Record<string, string>> = {
   '.woff2': 'font/woff2', '.png': 'image/png', '.ico': 'image/x-icon',
 }
 const BOOT = '<script>globalThis.__DSH_BOOT_READY__ = Promise.withResolvers()</script>'
+
+/** Mark requests from the owned main frame; also strip the marker on every other target or redirect. */
+export function appRequestHeaders(
+  request: Pick<OnBeforeSendHeadersListenerDetails, 'url' | 'webContentsId' | 'webContents' | 'frame' | 'resourceType' | 'requestHeaders'>,
+  owner: Pick<WebContents, 'id' | 'mainFrame'> | undefined,
+  nativeToken: string | undefined,
+): Record<string, string> {
+  const headers = Object.fromEntries(Object.entries(request.requestHeaders)
+    .filter(([name]) => name.toLowerCase() !== NATIVE_ACCESS_HEADER))
+  const target = new URL(request.url)
+  if (target.protocol === 'dsh-app:' && target.host === 'app' && owner && nativeToken
+    && request.webContentsId === owner.id && (!request.webContents || request.webContents.id === owner.id)
+    && request.resourceType !== 'mainFrame' && request.frame === owner.mainFrame
+    && !request.frame.detached && request.frame.origin === 'dsh-app://app') headers[NATIVE_ACCESS_HEADER] = nativeToken
+  return headers
+}
 
 /**
  * Read an application-owned static asset; the index waits for asynchronous Host injections.
@@ -57,19 +74,23 @@ export async function authenticateWebHost(url: string, nativeToken?: string): Pr
  * @param cookie - Host-issued authentication cookie.
  * @returns Host response without network-only encoding headers.
  */
-export async function forwardWebRequest(request: Request, host: string, cookie: string, nativeToken?: string): Promise<Response> {
+export async function forwardWebRequest(request: Request, host: string, cookie: string, nativeToken: string): Promise<Response> {
   const source = new URL(request.url)
   const origin = request.headers.get('origin')
+  // Custom-protocol fetches can omit Origin. The native session marks only
+  // requests from our owned main frame; an HTTP header or referrer alone is
+  // insufficient. Keep this compatible with the upstream's Electron 44.0 ABI.
+  if (source.protocol !== 'dsh-app:' || source.host !== 'app' || source.username || source.password
+    || !nativeToken || request.headers.get(NATIVE_ACCESS_HEADER) !== nativeToken) return new Response(null, { status: 403 })
   if (origin !== null && origin !== 'dsh-app://app') return new Response(null, { status: 403 })
   const market = source.pathname.startsWith('/api/community-market/')
-  if (market && !['GET', 'HEAD'].includes(request.method) && origin !== 'dsh-app://app') return new Response(null, { status: 403 })
   const target = new URL(host)
   target.pathname = source.pathname
   target.search = source.search
   const headers = new Headers(request.headers)
   for (const name of ['host', 'origin', 'cookie', 'sec-fetch-site', NATIVE_ACCESS_HEADER]) headers.delete(name)
   headers.set('cookie', cookie)
-  if (nativeToken) headers.set(NATIVE_ACCESS_HEADER, nativeToken)
+  headers.set(NATIVE_ACCESS_HEADER, nativeToken)
   // Market retains its own same-origin mutation gate. Only translate after
   // validating the application origin; never trust a caller-supplied Host.
   if (market) {
