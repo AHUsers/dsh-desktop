@@ -41,6 +41,7 @@ try {
   await context.grantPermissions(['local-network-access'], { origin: streamBaseUrl })
   await context.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])
   const controlCommands = []
+  let rejectPreference = false
   const controlState = {
     selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
     preferences: { closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off', browserAccess: false,
@@ -52,6 +53,7 @@ try {
   }
   await context.exposeFunction('__nextTestState', () => structuredClone(controlState))
   await context.exposeFunction('__nextTestCommand', command => {
+    if (command.type === 'preferences' && rejectPreference) { rejectPreference = false; throw new Error('Fixture: preference save rejected') }
     controlCommands.push(command)
     if (command.type === 'preferences') controlState.preferences = command.preferences
     if (command.type === 'switch') controlState.selected = command.name
@@ -191,6 +193,21 @@ try {
   await settings.getByRole('button', { name: /^(保存端口|Save ports)$/ }).click()
   await page.waitForFunction(() => !document.querySelector('[data-next-desktop-settings] [data-preference="port"]').disabled)
   assert.ok(controlCommands.some(command => command.type === 'preferences' && command.preferences.port === 23456 && !command.preferences.notifications))
+  rejectPreference = true
+  await closeToTray.check()
+  await settings.locator('[data-notice]').getByText('Fixture: preference save rejected').waitFor()
+  assert.equal(await closeToTray.isChecked(), false, 'A failed save restores the persisted value')
+  controlState.platform = 'win32'
+  await settings.locator('[data-refresh]').click()
+  await settings.locator('[data-platform="win32"]').waitFor({ state: 'visible' })
+  assert.equal(await settings.locator('[data-platform="darwin"]').isVisible(), false)
+  assert.equal(await settings.locator('[data-preference="windowsMaterial"] option[value="mica"]').getAttribute('hidden'), '')
+  controlState.platform = 'linux'
+  await settings.locator('[data-refresh]').click()
+  await settings.locator('[data-command="terminal"]').waitFor({ state: 'hidden' })
+  controlState.platform = 'darwin'
+  await settings.locator('[data-refresh]').click()
+  await settings.locator('[data-command="terminal"]').waitFor({ state: 'visible' })
   await settings.locator('[data-feature="market"][data-value="true"]').click()
   await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-feature="market"][data-value="true"]').getAttribute('aria-checked') === 'true')
   assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
@@ -236,6 +253,20 @@ try {
   await page.getByRole('button', { name: /^(稍后配置|Configure later)$/ }).click()
   await page.locator('.dshNextSafeModeNotice button').click()
   assert.deepEqual(controlCommands.at(-1), { type: 'controls', page: 'recovery' })
+  // The marker-free Web frontend must not inherit any native Settings actions.
+  const webContext = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1280, height: 840 } })
+  await webContext.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])
+  const webPage = await webContext.newPage()
+  webPage.setDefaultTimeout(15_000)
+  await webPage.goto(streamBaseUrl)
+  await webPage.getByRole('button', { name: /^(稍后配置|Configure later)$/ }).click()
+  await webPage.getByRole('button', { name: /^(设置|Settings)$/ }).click()
+  assert.equal(await webPage.locator('[data-next-settings-actions]').count(), 0)
+  assert.equal(await webPage.getByRole('button', { name: /^(桌面|Desktop)$/ }).count(), 0)
+  assert.equal(await webPage.evaluate(() => window.desktopNext === undefined), true)
+  assert.equal(await webPage.evaluate(() => globalThis.__DSH_TRANSPORT__?.ownsHost === true), false)
+  assert.equal(await webPage.evaluate(() => window.dshDesktop === undefined), true)
+  await webContext.close()
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
   console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, draft preservation, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')

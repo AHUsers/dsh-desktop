@@ -13,7 +13,7 @@ import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { resolveDesktopLocale } from './menu-locale.ts'
 import { NextDesktopRuntime } from './desktop-runtime.ts'
 import { NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState } from './desktop-contract.ts'
-import { networkChanged, parsePreferences } from './desktop-preferences.ts'
+import { portsChanged, parsePreferences } from './desktop-preferences.ts'
 import { NativeDesktop, applyWindowMaterial } from './native-desktop.ts'
 import { desktopLanAddresses } from './lan-addresses.ts'
 import { createLanHttpsCertificate } from './lan-https-certificate.ts'
@@ -118,7 +118,7 @@ function createWindow(preload: string, primary = false): BrowserWindow {
 
 function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' = 'general'): void {
   if (quitting) return
-  const url = `${SHELL_URL}?lang=${windowsLanguage.startsWith('zh') ? 'zh' : 'en'}#${page}`
+  const url = `${SHELL_URL}?lang=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}#${page}`
   if (shellWindow && !shellWindow.isDestroyed()) {
     void shellWindow.loadURL(url).catch(error => runtime.diagnostics.append(String(error), 'error'))
     show(shellWindow); return
@@ -152,8 +152,9 @@ async function command(value: unknown): Promise<void> {
   if (!value || typeof value !== 'object' || !('type' in value)) throw new Error('Invalid Next command')
   const input = value as Record<string, unknown>
   const type = input.type
+  if (typeof type !== 'string') throw new Error('Invalid Next command')
   if (type === 'controls') {
-    if (input.page !== undefined && !['general', 'profiles', 'create-profile', 'tools', 'recovery'].includes(String(input.page))) throw new Error('Invalid controls page')
+    if (input.page !== undefined && (typeof input.page !== 'string' || !['general', 'profiles', 'create-profile', 'tools', 'recovery'].includes(input.page))) throw new Error('Invalid controls page')
     openControls(input.page as Parameters<typeof openControls>[0]); return
   }
   if (type === 'quit') { app.quit(); return }
@@ -204,13 +205,19 @@ async function command(value: unknown): Promise<void> {
     }
     if (type === 'preferences') {
       const preferences = parsePreferences(input.preferences)
-      if (networkChanged(runtime.preferences, preferences)) {
+      if (portsChanged(runtime.preferences, preferences)) {
         if (!await confirmed(t('应用访问设置并重启 Host？', 'Apply access settings and restart the Host?'), preferences.browserAccess && preferences.networkExposure === 'lan'
           ? t('开启后，同一网络中的设备可通过 HTTPS 访问。登录链接可授予访问权限，请仅与可信设备共享。正在运行的任务会被中断。', 'Devices on your network can connect over HTTPS. Login links grant access; share only with trusted devices. Running tasks will be interrupted.')
           : undefined)) return
         await runtime.restart(() => runtime.writePreferences(preferences))
         if (mainWindow) await mainWindow.loadURL(APP_URL)
-      } else runtime.writePreferences(preferences)
+      } else {
+        if (preferences.browserAccess && preferences.networkExposure === 'lan'
+          && (!runtime.preferences.browserAccess || runtime.preferences.networkExposure !== 'lan')
+          && !await confirmed(t('允许局域网 HTTPS 访问？', 'Allow LAN access over HTTPS?'),
+            t('同一网络中的设备可以连接。请仅向可信设备分享登录链接，并在设备上核对和信任 CA 证书。', 'Devices on your local network can connect. Share login links only with trusted devices, and verify and trust the CA certificate on each device.'))) return
+        await runtime.applyPreferences(preferences)
+      }
       if (mainWindow) applyWindowMaterial(mainWindow, preferences)
       return
     }

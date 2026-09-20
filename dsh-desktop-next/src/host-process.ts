@@ -16,7 +16,7 @@ interface FatalEvent {
   readonly message: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'notification'; outcome: NotificationOutcome } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
+type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; outcome: NotificationOutcome } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -42,6 +42,8 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
     case 'update-tasks':
       return Number.isSafeInteger(candidate.requestId) && typeof candidate.active === 'boolean'
         && (candidate.error === undefined || typeof candidate.error === 'string')
+    case 'browser-access':
+      return Number.isSafeInteger(candidate.requestId) && (candidate.error === undefined || typeof candidate.error === 'string')
     default:
       return false
   }
@@ -85,6 +87,7 @@ export class DesktopHostProcess {
   private shutdownCompleted = false
   private nextControlId = 1
   private readonly taskQueries = new Map<number, { resolve: (active: boolean) => void; reject: (error: Error) => void }>()
+  private readonly accessRequests = new Map<number, { resolve: () => void; reject: (error: Error) => void }>()
 
   /**
    * @param node - Absolute Electron executable in Node mode.
@@ -163,6 +166,11 @@ export class DesktopHostProcess {
           else this.onTerminal?.()
         }
       }
+      else if (message.type === 'browser-access') {
+        const request = this.accessRequests.get(message.requestId)
+        if (message.error === undefined) request?.resolve()
+        else request?.reject(new Error(message.error))
+      }
       else {
         const query = this.taskQueries.get(message.requestId)
         if (message.error === undefined) query?.resolve(message.active)
@@ -179,6 +187,21 @@ export class DesktopHostProcess {
       })
     })
     return this.readyPromise
+  }
+
+  /** Acknowledge the live request gate before publishing browser access as enabled. */
+  async setBrowserAccess(enabled: boolean): Promise<void> {
+    const child = this.child
+    if (!child?.connected || this.stopping || this.failureReported) throw new Error('Next Host is unavailable')
+    const requestId = this.nextControlId++
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.accessRequests.set(requestId, { resolve, reject })
+        timer = setTimeout(() => reject(new Error('Browser access change timed out')), 5_000)
+        child.send({ type: 'browser-access', requestId, enabled }, error => { if (error) reject(error) })
+      })
+    } finally { clearTimeout(timer); this.accessRequests.delete(requestId) }
   }
 
   /**
@@ -237,6 +260,8 @@ export class DesktopHostProcess {
     this.readyReject(error)
     for (const query of this.taskQueries.values()) query.reject(error)
     this.taskQueries.clear()
+    for (const request of this.accessRequests.values()) request.reject(error)
+    this.accessRequests.clear()
     if (!this.failureReported && !this.stopping) {
       this.failureReported = true
       try { this.onFailure?.(error) } catch (listenerError) {

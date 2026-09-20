@@ -101,6 +101,8 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(state(sender).phase).toBe('error')
     expect(() => state({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     expect(() => state({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
+    await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: ['restart'] })).rejects.toThrow('Invalid Next command')
+    await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls', page: ['general'] })).rejects.toThrow('Invalid controls page')
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls' })
     expect(fixture.windows).toHaveLength(2)
     const controls = fixture.windows[1]

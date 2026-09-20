@@ -46,6 +46,7 @@ export class NextDesktopRuntime {
   auth: { url: string; cookie: string; token: string; injections: readonly unknown[] } | undefined
   lan: DesktopLanHttpsRuntime | undefined
   private safeHome: string | undefined
+  private hostProcess: DesktopHostProcess | undefined
 
   constructor(readonly options: RuntimeOptions) {
     this.profiles = new NextProfiles(options.home)
@@ -104,6 +105,37 @@ export class NextDesktopRuntime {
     this.options.onChange()
   }
 
+  /** Apply access toggles without stopping conversations or changing the renderer capability. */
+  async applyPreferences(value: unknown): Promise<void> {
+    const next = parsePreferences(value)
+    const previous = this.preferences
+    const host = this.hostProcess
+    const lan = this.lan
+    if (!host || !lan || !this.auth || this.safeMode || this.backend.state.phase !== 'ready') {
+      this.writePreferences(next); return
+    }
+    const changed = next.browserAccess !== previous.browserAccess || next.networkExposure !== previous.networkExposure
+    if (!changed) { this.writePreferences(next); return }
+    try {
+      await host.setBrowserAccess(next.browserAccess)
+      const edge = await lan.setEnabled(next.browserAccess && next.networkExposure === 'lan')
+      if (this.closing) throw new Error('Next is shutting down')
+      this.writePreferences(next)
+      if (edge.state === 'failed') this.diagnostics.append(`LAN HTTPS: ${edge.errorCode}`, 'warn')
+    } catch (error) {
+      if (!this.closing) {
+        try {
+          await host.setBrowserAccess(previous.browserAccess)
+          await lan.setEnabled(previous.browserAccess && previous.networkExposure === 'lan')
+        } catch {
+          // An unacknowledged access policy must never remain publicly reachable.
+          await this.backend.stop()
+        }
+      }
+      throw error
+    }
+  }
+
   state(): Pick<DesktopState, 'selected' | 'profiles' | 'unavailableProfiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
     let features = { ...DEFAULT_FEATURES }
     let profiles: string[] = []
@@ -141,7 +173,7 @@ export class NextDesktopRuntime {
     const actualHome = this.safeMode ? this.safeHome! : options.home
     const profile = this.safeMode ? 'default' : this.selected
     const effective = this.safeMode ? { ...this.preferences, browserAccess: false, networkExposure: 'loopback' as const, port: 0 } : this.preferences
-    const addresses = effective.browserAccess && effective.networkExposure === 'lan' ? options.addresses() : []
+    const addresses = options.addresses()
     const token = randomBytes(32).toString('base64url')
     const lan = new DesktopLanHttpsRuntime({ addresses, requestedPort: effective.lanPort,
       prepareCertificate: async () => ({ certificate: await options.certificate(addresses) }) })
@@ -153,6 +185,7 @@ export class NextDesktopRuntime {
         ...(this.safeMode ? { DSH_TELEMETRY_DISABLED: '1' } : {}) },
       onFailure, undefined, 'runtime', undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
       chunk => this.diagnostics.hostChunk(chunk), options.onTerminal)
+    this.hostProcess = host
     return {
       start: async (): Promise<void> => {
         let timer: ReturnType<typeof setTimeout> | undefined
@@ -182,6 +215,7 @@ export class NextDesktopRuntime {
         this.auth = undefined
         await lan.stop()
         await host.stop()
+        if (this.hostProcess === host) this.hostProcess = undefined
         if (this.lan === lan) this.lan = undefined
       },
     }
