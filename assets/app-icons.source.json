@@ -4,12 +4,14 @@
     "modifications": "Whale path extracted without the wordmark; white fill and desktop icon placement."
   },
   "artwork": {
+    "stable": "dsh-plugin-desktop/build/DSHDesktop.icon",
     "next": "dsh-desktop-next/assets/DSHDesktopNext.icon",
     "beta": "dsh-plugin-desktop-beta/build/DSHDesktopBeta.icon",
     "background": "system-dark",
-    "badge": "Same capsule, placement and effects for both variants; system heavy text with identical size and tracking, converted to SVG outlines."
+    "badge": "Same capsule, placement and effects for Next and Beta; system heavy text with identical size and tracking, converted to SVG outlines. The Stable composition preserves the badge group with hidden set to true."
   },
   "previews": {
+    "stable": "dsh-plugin-desktop/build/DSHDesktop.png",
     "next": "dsh-desktop-next/assets/app-icon-mac.png",
     "beta": "dsh-plugin-desktop-beta/build/DSHDesktopBeta.png",
     "tool": "Icon Composer ictool",
