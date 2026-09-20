@@ -75,6 +75,21 @@ try {
     assert.equal(reply.result.ok, true, JSON.stringify(reply))
     return reply.result.value
   }
+  // The official overview discovers installation-owned bundles from direct
+  // dependencies, even when their packages are already present transitively.
+  const availableBundles = await rpc('listBundles')
+  for (const [name, rowId] of [
+    ['@deepseek-ai/dsh-experimental-agent-team-profile', 'agent-team'],
+    ['@deepseek-ai/dsh-experimental-agent-team-web-profile', 'ui-agent-team'],
+  ]) {
+    const bundle = availableBundles.find(row => row.name === name)
+    assert.ok(bundle, `Official Plugins overview must offer ${name}`)
+    assert.equal(bundle.optional, true)
+    assert.equal(bundle.enabled, false, 'Team bundles must remain opt-in')
+    assert.equal(bundle.removable, false)
+    assert.equal(bundle.error, undefined)
+    assert.ok(bundle.rows.some(row => row.rowId === rowId), JSON.stringify(bundle))
+  }
   const packages = ['dsh-community-market', 'dshmarket', '@agents-anywhere/dsh-bridge-next']
   for (const name of packages) {
     const bundle = (await rpc('listBundles')).find(row => row.name === name)
