@@ -16,11 +16,11 @@ export const DESKTOP_CONTROLS_CSS = DESKTOP_SETTINGS_CSS + `
 .dshNextSettings .dshDesktopSettingsField input{width:100%;max-width:none}.dshNextSettings button[aria-checked=true]:disabled{opacity:1}
 .dshNextSettings .dshDesktopSettingsChoiceCopy{display:block;text-align:left}
 .dshNextSettings .nextSwitch{width:36px;height:20px;appearance:none;border:0;border-radius:99px;padding:2px;background:var(--dsw-alias-border-l2);cursor:pointer;flex-shrink:0;transition:background .15s}
-.dshNextSettings .nextSwitch:before{content:'';display:block;width:16px;height:16px;border-radius:50%;background:white;box-shadow:0 1px 2px #0003;transition:transform .15s}
+.dshNextSettings .nextSwitch:before{content:'';display:block;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-label-primary-foreground);box-shadow:0 1px 2px #0003;transition:transform .15s}
 .dshNextSettings .nextSwitch:checked{background:var(--dsw-alias-brand-primary)}.dshNextSettings .nextSwitch:checked:before{transform:translateX(16px)}
 .dshNextSettings .nextSwitch:disabled{opacity:.45;cursor:default}.dshNextSettings .dshDesktopSettingsToggleRow{margin:0}
-.dshNextSettings .nextPorts{display:flex;gap:12px;flex-wrap:wrap}.dshNextSettings .nextPorts label{flex:1;min-width:170px}
-.dshNextSettings .nextPorts button{align-self:center}.dshNextSettings .nextFeatureChoices{display:grid;gap:8px}
+.dshNextSettings .nextPorts{display:flex;gap:12px;flex-wrap:wrap}.dshNextSettings .nextPorts label{flex:1;min-width:170px;flex-direction:column;align-items:flex-start;gap:6px;font-size:12px}
+.dshNextSettings .nextPorts label input{width:100%}.dshNextSettings .nextPorts button{align-self:flex-end;margin-bottom:12px}.dshNextSettings .nextFeatureChoices{display:grid;gap:8px}
 .dshNextSettings input:disabled,.dshNextSettings select:disabled{opacity:.55}
 .dshNextSettings[data-presentation=settings]>nav,.dshNextSettings[data-presentation=settings]>details{display:none}
 .dshNextSettings [data-feature][aria-checked=true]{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}

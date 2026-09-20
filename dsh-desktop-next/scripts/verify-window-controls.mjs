@@ -194,8 +194,10 @@ try {
   await page.waitForFunction(() => !document.querySelector('[data-next-desktop-settings] [data-preference="port"]').disabled)
   assert.ok(controlCommands.some(command => command.type === 'preferences' && command.preferences.port === 23456 && !command.preferences.notifications))
   rejectPreference = true
-  await closeToTray.check()
+  // This save deliberately fails and reverts, so check()'s checked postcondition is inappropriate.
+  await closeToTray.click()
   await settings.locator('[data-notice]').getByText('Fixture: preference save rejected').waitFor()
+  await page.waitForFunction(() => { const input = document.querySelector('[data-next-desktop-settings] [data-preference="closeToTray"]'); return !input.checked && !input.disabled })
   assert.equal(await closeToTray.isChecked(), false, 'A failed save restores the persisted value')
   controlState.platform = 'win32'
   await settings.locator('[data-refresh]').click()
@@ -213,6 +215,10 @@ try {
   assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
   await settings.getByRole('heading', { name: /^(桌面设置|Desktop settings)$/ }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-settings.png'), animations: 'disabled' })
+  await settings.getByRole('heading', { name: /^(窗口与托盘|Window and tray)$/ }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(screenshots, 'desktop-access-settings.png'), animations: 'disabled' })
+  await settings.getByRole('heading', { name: /^(通知|Notifications)$/ }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(screenshots, 'desktop-notification-settings.png'), animations: 'disabled' })
   await settings.locator('[data-command="switch"][data-name="work"]').click()
   await page.waitForFunction(() => document.querySelector('[data-next-desktop-settings] [data-status]').textContent.startsWith('work'))
   assert.deepEqual(controlCommands.at(-1), { type: 'switch', name: 'work' })
