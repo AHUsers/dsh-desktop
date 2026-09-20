@@ -12,7 +12,9 @@ import { installSidebarFooterStyles } from '../../../dsh-plugin-desktop-beta/src
 import { NextSettingsAdapter } from './settings-adapter.ts'
 import { NextDesktopSettings, NextDesktopActions } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
-import { registerComputerUse } from './computer-use.tsx'
+import { registerPluginControls } from './plugin-controls.tsx'
+import { installPluginControlsStyles } from './plugin-controls-styles.ts'
+import { SettingsRequests } from './settings-requests.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -39,6 +41,9 @@ export function apply(ctx: Context): void {
     zh: { 'sidebar.open': '展开侧边栏', settings: '桌面', language: 'zh', safeMode: '安全模式', safeModeDetail: '这是临时环境，退出后不会保留其中的数据。', recovery: '打开恢复助手' },
     en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
   }), 'Next window control labels')
+  ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
+  ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
+  registerPluginControls(ctx)
   if (window.desktopNext) {
     const permissions = window.desktopNext.permissions
     if (permissions) ctx.effect(() => {
@@ -47,8 +52,6 @@ export function apply(ctx: Context): void {
     }, 'Native Desktop permissions')
     ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
-    ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
-    registerComputerUse(ctx)
     const t = ctx.locale.bind('desktop-next')
     ctx.slots.inject('settings.section', () => ctx.slots.register({
       name: 'settings.section', id: 'desktop-next', order: 100, locale: 'desktop-next', label: () => t('settings'), inject: () => ({ adapter }),
@@ -56,6 +59,9 @@ export function apply(ctx: Context): void {
     ctx.slots.inject('settings.action', () => ctx.slots.register({
       name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next', inject: () => ({ adapter }),
     }, SettingsActions))
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+      name: 'shell.overlay', id: 'desktop-next-settings-requests', order: 90, locale: 'desktop-next',
+    }, SettingsRequests))
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))

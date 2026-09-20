@@ -169,7 +169,7 @@ function useScope<T>(scope: Pick<SettingsScope<T>, 'getSnapshot' | 'subscribe'>)
   return useSyncExternalStore(subscribe, snapshot)
 }
 
-function Choice({
+export function Choice({
   title,
   body,
   aside,
@@ -277,7 +277,7 @@ function profileState(profile: DesktopProfileView, t: Translate): string {
   return t('profileReady')
 }
 
-const MARKET_OPTIONS: readonly {
+export const MARKET_OPTIONS: readonly {
   id: DesktopMarketProvider
   title: DesktopSettingsLocaleKey
   body: DesktopSettingsLocaleKey
@@ -291,7 +291,7 @@ const COMMUNITY_MARKET_URL = 'https://github.com/anywhere-labs/deepseek-harness-
 const DSH_MARKET_URL = 'https://github.com/dsh-market/dsh-market'
 const AWESOME_DSH_PLUGIN_URL = 'https://github.com/awesome-dsh-plugin/awesome-dsh-plugin'
 
-function marketTitle(option: (typeof MARKET_OPTIONS)[number], t: Translate): ReactNode {
+export function marketTitle(option: (typeof MARKET_OPTIONS)[number], t: Translate): ReactNode {
   if (option.id === 'community-market') {
     return <RepositoryLink href={COMMUNITY_MARKET_URL}>{t(option.title)}</RepositoryLink>
   }
@@ -301,7 +301,7 @@ function marketTitle(option: (typeof MARKET_OPTIONS)[number], t: Translate): Rea
   return t(option.title)
 }
 
-function marketBody(option: (typeof MARKET_OPTIONS)[number], t: Translate): ReactNode {
+export function marketBody(option: (typeof MARKET_OPTIONS)[number], t: Translate): ReactNode {
   if (option.id !== 'dsh-market') return t(option.body)
   return (
     <>

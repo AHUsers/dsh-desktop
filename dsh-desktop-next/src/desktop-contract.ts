@@ -8,6 +8,7 @@ export type DesktopNotification =
   | { outcome: 'turn-completed'; userMessage: string; assistantMessage: string }
   | { outcome: 'turn-failed' }
 export type NotificationOutcome = DesktopNotification['outcome']
+export type DesktopSettingsPage = 'general' | 'permissions'
 
 export interface DesktopPreferences {
   closeToTray: boolean
@@ -73,6 +74,8 @@ export type DesktopCommand =
 
 export interface DesktopBridge {
   readonly permissions?: DesktopPermissions
+  /** Native menu/Host requests, delivered only to the main app. */
+  onOpenSettings?(listener: (page: DesktopSettingsPage) => void): () => void
   state(): Promise<DesktopState>
   browserLinks(): Promise<DesktopBrowserLinks>
   command(command: DesktopCommand): Promise<void>

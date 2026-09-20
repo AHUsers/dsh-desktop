@@ -236,6 +236,12 @@
       "dsh-community-market",
       "dshmarket",
       "@agents-anywhere/dsh-bridge-next"
+    ],
+    "exclusiveBundles": [
+      [
+        "dsh-community-market",
+        "dshmarket"
+      ]
     ]
   }
 }

@@ -1,21 +1,12 @@
 /** Mount the existing Desktop page and controls against Next's native adapter. */
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { DesktopSettingsSection, DesktopSettingsToggleRow } from '../../../dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx'
 import { DesktopNativeActions } from '../../../dsh-plugin-desktop-beta/src/client/DesktopNativeActions.tsx'
 import { en, zh, type DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 import type { DesktopCommand, DesktopState } from '../desktop-contract.ts'
 import { NextSettingsAdapter } from './settings-adapter.ts'
 import { DesktopPermissionsSection } from './permissions.tsx'
-
-export function useDesktopState(adapter: NextSettingsAdapter): DesktopState | undefined {
-  const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot)
-  useEffect(() => {
-    void adapter.refresh().catch(() => {})
-    const timer = setInterval(() => { if (!document.hidden) void adapter.refresh().catch(() => {}) }, 2000)
-    return () => clearInterval(timer)
-  }, [adapter])
-  return state
-}
+import { useDesktopState } from './desktop-state.ts'
 
 export function desktopTranslate(language: string): (key: string) => string {
   const copy = language.startsWith('zh') ? zh : en

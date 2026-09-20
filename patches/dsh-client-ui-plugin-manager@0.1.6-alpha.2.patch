@@ -1,0 +1,90 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -27,6 +27,7 @@
+ 			return `${bundle}#${rowId}`;
+ 		}
+ 		const SLOTS = [
++			"plugins.bundle.hidden",
+ 			"plugins.item",
+ 			"plugins.bundle.config",
+ 			"plugins.row.config"
+@@ -41,6 +42,7 @@
+ 			let revision = -1;
+ 			let ledger = {
+ 				items: [],
++				hiddenBundles: new Set(),
+ 				bundles: /* @__PURE__ */ new Set(),
+ 				rows: /* @__PURE__ */ new Set()
+ 			};
+@@ -58,6 +60,7 @@
+ 								id: entry.options.id ?? "",
+ 								label: (0, _deepseek_ai_dsh_client_ui_slots.resolveSlotLabel)(entry.options.label) ?? ""
+ 							})),
++							hiddenBundles: keysOf("plugins.bundle.hidden"),
+ 							bundles: keysOf("plugins.bundle.config"),
+ 							rows: keysOf("plugins.row.config")
+ 						};
+@@ -1930,7 +1933,7 @@
+ 				};
+ 			}, [highlight, clearHighlight]);
+ 			const noticeLine = state.notice === null ? null : noticeText(state.notice, t);
+-			const listed = state.packages.filter((pkg) => !BUILTIN_PROFILE_BUNDLES.has(pkg.name) && (pkg.installed || pkg.optional || pkg.error !== void 0));
++			const listed = state.packages.filter((pkg) => !BUILTIN_PROFILE_BUNDLES.has(pkg.name) && !ledger.hiddenBundles?.has(pkg.name) && (pkg.installed || pkg.optional || pkg.error !== void 0));
+ 			const mine = listed.filter((pkg) => pkg.installed || !pkg.optional);
+ 			const official = listed.filter((pkg) => pkg.optional && !pkg.installed);
+ 			const loaded = state.status === "ready" || state.status === "error";
+@@ -2034,6 +2037,7 @@
+ 							})]
+ 						})]
+ 					}) : null,
++					showsCards && loaded ? renderSlot("plugins.overview", {}) : null,
+ 					state.status === "loading" ? (0, react_jsx_runtime.jsx)("p", {
+ 						className: PluginManagerPage_module_css_default.status,
+ 						children: t("loading")
+@@ -2516,6 +2520,8 @@
+ 				locale: NS,
+ 				inject: () => controller.inject(configLedger),
+ 				children: {
++					"plugins.overview": { kind: "list", scope: "root" },
++					"plugins.bundle.hidden": { kind: "keyed", scope: "root" },
+ 					"plugins.item": {
+ 						kind: "list",
+ 						scope: "root"
+diff --git a/lib/types/client/slot-contract.d.ts b/lib/types/client/slot-contract.d.ts
+--- a/lib/types/client/slot-contract.d.ts
++++ b/lib/types/client/slot-contract.d.ts
+@@ -16,6 +16,10 @@
+ }
+ declare module '@deepseek-ai/dsh-client-ui-slots' {
+     interface SlotMap {
++        /** Controls above the ordinary plugin cards. */
++        'plugins.overview': { kind: 'list'; scope: 'root'; };
++        /** Bundle names managed by overview controls instead of ordinary cards. */
++        'plugins.bundle.hidden': { kind: 'keyed'; scope: 'root'; };
+         /**
+          * One official plugin the Plugins page lists in its Official group after
+          * the official bundles: `label` is the card's title and `order` its place.
+diff --git a/lib/types/client/config-ledger.d.ts b/lib/types/client/config-ledger.d.ts
+--- a/lib/types/client/config-ledger.d.ts
++++ b/lib/types/client/config-ledger.d.ts
+@@ -19,6 +19,7 @@
+  */
+ export interface ConfigLedger {
+     readonly items: readonly OfficialItem[];
++    readonly hiddenBundles?: ReadonlySet<string>;
+     readonly bundles: ReadonlySet<string>;
+     readonly rows: ReadonlySet<string>;
+ }
+diff --git a/lib/types/client/PluginManagerPage.d.ts b/lib/types/client/PluginManagerPage.d.ts
+--- a/lib/types/client/PluginManagerPage.d.ts
++++ b/lib/types/client/PluginManagerPage.d.ts
+@@ -12,7 +12,7 @@
+ import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+ import { type PluginManagerFace } from './manager-store.ts';
+ /** Full component props assembled by the main slot renderer. */
+-export type PluginManagerPageProps = PropsRuntime<'main'> & PropsLocale<'pluginManager'> & PropsRenderSlots<'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config'> & InjectFace<PluginManagerFace>;
++export type PluginManagerPageProps = PropsRuntime<'main'> & PropsLocale<'pluginManager'> & PropsRenderSlots<'plugins.overview' | 'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config'> & InjectFace<PluginManagerFace>;
+ /** Render the plugin manager: the official plugins and installed bundles, their pages, the install dialog, and the confirmation. */
+ export declare function PluginManagerPage(props: PluginManagerPageProps): ReactNode;
+ //# sourceMappingURL=PluginManagerPage.d.ts.map

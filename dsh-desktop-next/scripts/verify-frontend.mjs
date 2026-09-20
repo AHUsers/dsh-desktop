@@ -23,16 +23,37 @@ for (const platform of ['darwin', 'win32', 'linux']) {
   const invocations = []
   const userActivation = { isActive: false }
   for (const [entry, hostname] of [['preload-app.cjs', 'app'], ['preload-shell.cjs', 'shell']]) {
+    const listeners = new Map()
+    let requestedPage = 'general'
     runInNewContext(readFileSync(join(root, 'lib', entry), 'utf8'), {
       require: name => {
         assert.equal(name, 'electron', 'Sandboxed preloads may not require local chunks or Node modules')
-        return { contextBridge: { exposeInMainWorld: (name, api) => exposed.set(name, api) }, ipcRenderer: { invoke: (...args) => { invocations.push(args) }, send() {} } }
+        return { contextBridge: { exposeInMainWorld: (name, api) => exposed.set(name, api) }, ipcRenderer: {
+          invoke: (...args) => { invocations.push(args); return Promise.resolve(args[0] === 'dsh-next:settings-take' ? requestedPage : undefined) }, send() {},
+          on: (channel, listener) => listeners.set(channel, listener), removeListener: channel => listeners.delete(channel),
+        } }
       },
       process: { platform }, location: { protocol: 'dsh-app:', hostname },
       document: { readyState: 'loading', documentElement: { dataset, style: { setProperty() {} } } },
       window: { addEventListener() {} }, console,
       navigator: { userActivation },
     }, { filename: entry })
+    if (hostname === 'app') {
+      const received = []
+      const stop = exposed.get('desktopNext').onOpenSettings(page => received.push(page))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      assert.deepEqual(received, ['general'], 'A request made before the client mounts must be delivered')
+      requestedPage = 'permissions'
+      listeners.get('dsh-next:settings-open')()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      assert.deepEqual(received, ['general', 'permissions'])
+      requestedPage = 'unsupported'
+      listeners.get('dsh-next:settings-open')()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      assert.deepEqual(received, ['general', 'permissions'])
+      stop()
+      assert.equal(listeners.has('dsh-next:settings-open'), false)
+    } else assert.equal(exposed.get('desktopNext').onOpenSettings, undefined)
   }
   assert.equal(dataset.platform, platform)
   assert.equal(exposed.get('dshDesktop')?.protocolVersion, 1)

@@ -17,7 +17,7 @@ it('keeps the original tray tool order, direct recovery actions and Profile crea
   const menu = desktopMenu(state, 'zh-CN', show, run)
   expect(menu.filter(item => item.type !== 'separator').map(item => item.label)).toEqual([
     '打开 DSH Desktop Next', '重新加载界面', '打开 DSH 终端', '导出诊断信息…', '进入安全模式…',
-    'Profile：default', '桌面设置…', '恢复助手…', '退出',
+    'Profile：default', '设置…', '恢复助手…', '退出',
   ])
   const profiles = menu.find(item => item.label === 'Profile：default')!.submenu
   if (!Array.isArray(profiles)) throw new Error('Missing Profile submenu')
@@ -30,7 +30,7 @@ it('keeps the original tray tool order, direct recovery actions and Profile crea
   expect(run).toHaveBeenLastCalledWith({ type: 'controls', page: 'create-profile' })
   ;(menu.find(item => item.label === '进入安全模式…')!.click as () => void)()
   expect(run).toHaveBeenLastCalledWith({ type: 'safe-mode' })
-  expect(menu.find(item => item.label === '桌面设置…')!.accelerator).toBe('CmdOrCtrl+,')
+  expect(menu.find(item => item.label === '设置…')!.accelerator).toBe('CmdOrCtrl+,')
   expect(menu.at(-1)!.accelerator).toBe('CmdOrCtrl+Q')
 })
 
@@ -39,7 +39,7 @@ it('keeps valid escape routes during failure or safe mode and only advertises su
   expect(menu.some(item => item.label === 'Open DSH Terminal')).toBe(false)
   expect(menu.find(item => item.label === 'Reload Interface')!.enabled).toBe(false)
   expect(menu.find(item => item.label === 'Exit Safe Mode and Restart…')!.enabled).toBe(false)
-  expect(menu.find(item => item.label === 'Desktop Settings…')!.enabled).toBe(true)
+  expect(menu.find(item => item.label === 'Settings…')!.enabled).toBe(true)
   expect(menu.at(-1)!.enabled).not.toBe(false)
   expect(desktopMenu({ ...state, browserUrl: 'http://127.0.0.1:1234' }, 'en', vi.fn(), vi.fn()).some(item => item.label === 'Open in Browser')).toBe(true)
 })

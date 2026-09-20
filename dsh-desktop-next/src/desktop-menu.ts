@@ -24,7 +24,7 @@ export function desktopMenu(state: DesktopState, language: string, show: () => v
       { label: t('管理 Profile…', 'Manage Profiles…'), click: () => run({ type: 'controls', page: 'profiles' }) },
     ] },
     { type: 'separator' },
-    action(t('桌面设置…', 'Desktop Settings…'), 'controls'),
+    action(t('设置…', 'Settings…'), 'controls'),
     ...(state.browserUrl ? [action(t('在浏览器中打开', 'Open in Browser'), 'open-browser')] : []),
     { label: t('恢复助手…', 'Recovery Assistant…'), click: () => run({ type: 'controls', page: 'recovery' }) },
     { type: 'separator' },

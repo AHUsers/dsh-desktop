@@ -1,6 +1,7 @@
 export const IPC = {
   boot: 'dsh-next:boot', failed: 'dsh-next:failed', directory: 'dsh-next:directory',
   state: 'dsh-next:state', command: 'dsh-next:command',
+  settingsOpen: 'dsh-next:settings-open', settingsTake: 'dsh-next:settings-take',
   browserLinks: 'dsh-next:browser-links',
   permissionQuery: 'dsh-next:permission-query', permissionRequest: 'dsh-next:permission-request', permissionSettings: 'dsh-next:permission-settings',
   material: 'dsh-next:material',

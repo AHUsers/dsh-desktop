@@ -2817,6 +2817,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-client-ui-plugin-manager@patch:@deepseek-ai/dsh-client-ui-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz#./patches/dsh-client-ui-plugin-manager@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-client-ui-plugin-manager@patch:@deepseek-ai/dsh-client-ui-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz%3A%3Ahash=5c7e14&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-client-ui-plugin-manager@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=a21f23&locator=deepseek-harness-desktop%40workspace%3A."
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+  checksum: 10c0/fe39139901eaa067024c4f9c204ec3a004f0076a69af434949b9b37bcb941cc1e50e5c65b57d47f9898568c30397b7a1bb9d3d5cbab50ddd3f5e4055f0f90176
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-client-ui-primitives@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-primitives-0.1.5-rc.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.5-rc.2
   resolution: "@deepseek-ai/dsh-client-ui-primitives@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-primitives-0.1.5-rc.2.tgz#vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-primitives-0.1.5-rc.2.tgz::hash=f38e8a&locator=deepseek-harness-desktop%40workspace%3A."
@@ -5124,7 +5133,7 @@ __metadata:
 
 "@deepseek-ai/dsh-plugin-manager@patch:@deepseek-ai/dsh-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz#./patches/dsh-plugin-manager@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.6-alpha.2
-  resolution: "@deepseek-ai/dsh-plugin-manager@patch:@deepseek-ai/dsh-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%3A%3Ahash=95dd1b&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-plugin-manager@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=21f625&locator=deepseek-harness-desktop%40workspace%3A."
+  resolution: "@deepseek-ai/dsh-plugin-manager@patch:@deepseek-ai/dsh-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%3A%3Ahash=95dd1b&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-plugin-manager@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=041fb3&locator=deepseek-harness-desktop%40workspace%3A."
   dependencies:
     "@deepseek-ai/dsh-app-boot": "npm:^0.1.6-alpha.2"
     "@deepseek-ai/dsh-atomic-write": "npm:^0.1.6-alpha.2"
@@ -5150,7 +5159,7 @@ __metadata:
       optional: true
     "@deepseek-ai/dsh-user-approval":
       optional: true
-  checksum: 10c0/f0550ce0d10c7ee6cc73c2ea5807f349d58f1176c0c67240380d027c47f1329860c4527138ea5a524b0ca9d8c44d4b4b1ea7db147c5f4622de68299cfac5423f
+  checksum: 10c0/703770b61da32f2005373dfb0a70cd5913df1a37322b44783e7fa43ce0a531ac4e0e2a27c7aae1583db769ad2dd54b7545451a041f5e91e005306edd04d7d342
   languageName: node
   linkType: hard
 

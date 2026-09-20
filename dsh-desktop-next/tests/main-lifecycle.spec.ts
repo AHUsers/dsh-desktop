@@ -9,6 +9,7 @@ import type { NextDesktopRuntime } from '../src/desktop-runtime.ts'
 const fixture = vi.hoisted(() => ({
   windows: [] as any[], trays: [] as any[], handlers: new Map<string, (...args: any[]) => any>(),
   close: vi.fn(async () => {}), start: vi.fn(async () => {}), preferences: { closeToTray: true },
+  phase: 'ready' as 'ready' | 'error',
   onPermission: undefined as ConstructorParameters<typeof NextDesktopRuntime>[0]['onPermission'],
 }))
 vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
@@ -25,7 +26,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   close = fixture.close
   browserLinks() { return { localUrl: null, lanUrls: [] } }
   state() { return { selected: 'default', profiles: ['default'], unavailableProfiles: [], features: { remoteControl: false, market: true },
-    preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : 'error', busy: this.busy, failure: 'Fixture Host failure', safeMode: false,
+    preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : fixture.phase, busy: this.busy, failure: 'Fixture Host failure', safeMode: false,
     home: 'temporary', browserUrl: null, lan: null, checkpoint: null, logs: '' } }
   report() {}
 } }))
@@ -38,7 +39,7 @@ vi.mock('electron', async () => {
   class BrowserWindow extends EventEmitter {
     visible = false
     webContents = Object.assign(new EventEmitter(), { id: fixture.windows.length + 1,
-      mainFrame: { url: '' }, getURL: () => this.webContents.mainFrame.url, setWindowOpenHandler() {}, send() {}, isDestroyed: () => false,
+      mainFrame: { url: '' }, getURL: () => this.webContents.mainFrame.url, setWindowOpenHandler() {}, send: vi.fn(), isDestroyed: () => false,
       isFocused: () => true, executeJavaScript: vi.fn(async () => true) })
     constructor(readonly options: any) { super(); fixture.windows.push(this) }
     isDestroyed() { return false }
@@ -82,6 +83,7 @@ vi.mock('electron', async () => {
 beforeEach(async () => {
   vi.resetModules()
   fixture.windows.length = 0; fixture.trays.length = 0; fixture.handlers.clear()
+  fixture.phase = 'ready'
   fixture.start.mockClear(); fixture.close.mockReset().mockResolvedValue(undefined)
   const { app } = await import('electron')
   app.removeAllListeners()
@@ -108,7 +110,7 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(window.visible).toBe(true)
     const state = fixture.handlers.get('dsh-next:state')!
     const sender = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
-    expect(state(sender).phase).toBe('error')
+    expect(state(sender).phase).toBe('ready')
     expect(() => state({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     expect(() => state({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     const browserLinks = fixture.handlers.get('dsh-next:browser-links')!
@@ -125,10 +127,26 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: ['restart'] })).rejects.toThrow('Invalid Next command')
     await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls', page: ['general'] })).rejects.toThrow('Invalid controls page')
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls' })
+    expect(fixture.windows).toHaveLength(1)
+    expect(window.visible).toBe(true)
+    expect(window.webContents.send).toHaveBeenCalledWith('dsh-next:settings-open')
+    const takeSettings = fixture.handlers.get('dsh-next:settings-take')!
+    expect(() => takeSettings({ ...sender, senderFrame: {} })).toThrow('Rejected')
+    expect(takeSettings(sender)).toBe('general')
+    expect(takeSettings(sender)).toBeUndefined()
+    tray.menu.find((item: any) => item.accelerator === 'CmdOrCtrl+,').click()
+    expect(takeSettings(sender)).toBe('general')
+    window.webContents.emit('before-input-event', { preventDefault() {} }, { type: 'keyDown', key: ',', meta: true })
+    expect(takeSettings(sender)).toBe('general')
+    expect(fixture.windows).toHaveLength(1)
+    fixture.phase = 'error'
+    await fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls' })
     expect(fixture.windows).toHaveLength(2)
     const controls = fixture.windows[1]
-    expect(controls.webContents.mainFrame.url).toBe(`dsh-app://shell/index.html?locale=zh&platform=${process.platform}&frame=${process.platform !== 'linux'}#general`)
+    expect(controls.webContents.mainFrame.url).toBe(`dsh-app://shell/index.html?locale=zh&platform=${process.platform}&frame=${process.platform !== 'linux'}#recovery`)
     expect(state({ sender: controls.webContents, senderFrame: controls.webContents.mainFrame }).failure).toBe('Fixture Host failure')
+    expect(() => takeSettings({ sender: controls.webContents, senderFrame: controls.webContents.mainFrame })).toThrow('Rejected')
+    fixture.phase = 'ready'
     fixture.handlers.get('dsh-next:locale')!({ ...sender, senderFrame: {} }, 'en')
     expect(tray.menu[0].label).toBe('打开 DSH Desktop Next')
     fixture.handlers.get('dsh-next:locale')!(sender, 'en')
@@ -137,9 +155,12 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     const previousUrl = controls.webContents.mainFrame.url
     expect((await fixture.onPermission!('query', 'screen')).status).not.toBe('granted')
     expect(controls.webContents.mainFrame.url).toBe(previousUrl)
+    expect(takeSettings(sender)).toBeUndefined()
     await fixture.onPermission!('request', 'screen')
-    expect(controls.webContents.mainFrame.url).toMatch(/#permissions$/)
+    expect(takeSettings(sender)).toBe('permissions')
     await fixture.onPermission!('open-settings', 'microphone')
+    expect(takeSettings(sender)).toBe('permissions')
+    expect(controls.webContents.mainFrame.url).toBe(previousUrl)
     expect(fixture.windows).toHaveLength(2)
     expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled()
     expect(desktopCapturer.getSources).not.toHaveBeenCalled()
