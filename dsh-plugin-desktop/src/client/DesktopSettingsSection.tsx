@@ -55,6 +55,7 @@ export interface DesktopSettingsSectionInjected {
     readonly nativeLanConfirmation?: boolean
     readonly jobNotifications?: boolean
   }
+  readonly introNotice?: ReactNode
   readonly browserActions?: ReactNode
   readonly extraSections?: ReactNode
 }
@@ -355,6 +356,7 @@ export function DesktopSettingsSection({
   desktopSettings,
   notificationSettings,
   capabilities,
+  introNotice,
   browserActions,
   extraSections,
 }: DesktopSettingsSectionInjected & Pick<PropsLocale<'desktop.settings'>, 't'>) {
@@ -551,6 +553,7 @@ export function DesktopSettingsSection({
         <p>{t('intro')}</p>
       </header>
 
+      {introNotice}
       {operationFailed && aaStatus !== 'failed' && <p className="dshDesktopSettingsError" role="alert">{t('operationFailed')}</p>}
       {restart !== 'none' && (
         <p className="dshDesktopSettingsSuccess" role="status">

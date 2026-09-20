@@ -6,6 +6,7 @@ import { initProfile, loadProfileDirectory, PROFILE_TEMPLATES, type Profile } fr
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { atomicJson, atomicText, readPrivateFile } from './private-files.ts'
 import { NextRecovery } from './recovery.ts'
+import { DEFAULT_PROFILE } from './desktop-contract.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
 export const WEB_BUNDLES = [...PROFILE_TEMPLATES.web!.bundles, 'dsh-desktop-next']
@@ -50,7 +51,7 @@ export class NextProfiles {
   get active(): string {
     const file = join(this.home, 'desktop-next.json')
     const text = readPrivateFile(file)
-    if (text === undefined) return 'default'
+    if (text === undefined) return DEFAULT_PROFILE
     return profileName((JSON.parse(text) as { active?: unknown }).active)
   }
   select(name: string): void {

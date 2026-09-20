@@ -44,9 +44,9 @@ async function boot(name) {
 }
 async function stop() { await host.stop(true); host = undefined }
 try {
-  const dir = manager.ensure('default')
+  const dir = manager.ensure('desktop')
   writeFileSync(join(dir, 'pnpm-workspace.yaml'), `storeDir: ${JSON.stringify(join(home, 'store'))}\n`)
-  manager.setFeatures('default', { remoteControl: true, market: true, dshMarket: true })
+  manager.setFeatures('desktop', { remoteControl: true, market: true, dshMarket: true })
   // Install only a local empty fixture. No catalog, registry or user profile is changed.
   const fixture = join(home, 'fixture-plugin')
   mkdirSync(fixture)
@@ -55,7 +55,7 @@ try {
   runner = createPackageRunner(pnpmInvocation, dir)
   const { createDesktopPluginRuntime } = await import(new URL('./lib/dsh-cli.js', pathToFileURL(createRequire(import.meta.url).resolve('dshmarket/package.json'))))
   const marketRuntime = createDesktopPluginRuntime(runner, dir, home)
-  const installed = await marketRuntime.runPlugin('default', ['add', '--offline', '--ignore-scripts', `file:${fixture}`])
+  const installed = await marketRuntime.runPlugin('desktop', ['add', '--offline', '--ignore-scripts', `file:${fixture}`])
   assert.equal(installed.exitCode, 0, JSON.stringify(installed))
   const install = runner.run(['list'])
   let output = ''
@@ -64,7 +64,7 @@ try {
   await runner.dispose()
   const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
   assert.ok(manifest.dsh.profile.bundles.includes('fixture-next-plugin'), 'Official plugin operations must activate the bundle')
-  let { origin, cookie } = await boot('default')
+  let { origin, cookie } = await boot('desktop')
   const rpc = async (method, args = {}) => {
     const rpcId = crypto.randomUUID()
     const response = await fetch(`${origin}/api/pluginManager/${method}`, {
@@ -88,8 +88,8 @@ try {
   }
   await rpc('setBundleEnabled', { name: packages[2], enabled: false })
   await stop()
-  ;({ origin, cookie } = await boot('default'))
-  assert.deepEqual(manager.features('default'), { market: false, remoteControl: false, dshMarket: true })
+  ;({ origin, cookie } = await boot('desktop'))
+  assert.deepEqual(manager.features('desktop'), { market: false, remoteControl: false, dshMarket: true })
   assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[2] && row.enabled), false)
   await rpc('setBundleEnabled', { name: packages[2], enabled: true })
   for (const name of packages.slice(1)) {
@@ -105,7 +105,7 @@ try {
   assert.equal(enabledRow.application, 'applied', JSON.stringify(enabledRow))
   const selectedMarket = await rpc('setBundleEnabled', { name: packages[0], enabled: true })
   assert.equal(selectedMarket.application, 'applied', JSON.stringify(selectedMarket))
-  assert.deepEqual(manager.features('default'), { market: true, remoteControl: true })
+  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true })
   assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[1] && row.enabled), false)
   const denied = await fetch(`${origin}/api/community-market/state`)
   assert.equal(denied.status, 401)
@@ -129,7 +129,7 @@ try {
   }
   // Probe the real dshmarket update gate without updating or fetching a package.
   await rpc('setBundleEnabled', { name: packages[1], enabled: true })
-  assert.deepEqual(manager.features('default'), { market: false, remoteControl: true, dshMarket: true })
+  assert.deepEqual(manager.features('desktop'), { market: false, remoteControl: true, dshMarket: true })
   for (const originHeader of [undefined, 'dsh-app://app']) {
     const request = new Request('dsh-app://app/dsh-market/update', {
       method: 'POST', body: JSON.stringify({ name: 'fixture-not-installed' }),
@@ -197,7 +197,7 @@ try {
   writeFileSync(policyFile, policy)
   runner = createPackageRunner(pnpmInvocation, dir)
   const recent = await createDesktopPluginRuntime(runner, dir, home)
-    .runPlugin('default', ['add', '--ignore-scripts', '--save-exact', `${registry.name}@${registry.version}`])
+    .runPlugin('desktop', ['add', '--ignore-scripts', '--save-exact', `${registry.name}@${registry.version}`])
   assert.equal(recent.exitCode, 0, JSON.stringify(recent))
   const uninstalled = await rpc('removeBundle', { name: 'fixture-next-plugin' })
   assert.equal(uninstalled.application, 'applied', JSON.stringify(uninstalled))
@@ -213,9 +213,9 @@ try {
   await runner.dispose()
   await stop()
   writeFileSync(join(dir, 'cordis.patch.yml'), ': broken: [yaml')
-  await manager.recover('default')
-  assert.deepEqual(manager.features('default'), { remoteControl: false, market: false })
-  const recovered = await boot('default')
+  await manager.recover('desktop')
+  assert.deepEqual(manager.features('desktop'), { remoteControl: false, market: false })
+  const recovered = await boot('desktop')
   const recoveredPage = await fetch(`${recovered.origin}/`, { headers: { cookie: recovered.cookie } })
   assert.equal(recoveredPage.status, 200)
   const recoveredHtml = await recoveredPage.text()

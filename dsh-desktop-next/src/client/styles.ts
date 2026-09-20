@@ -1,4 +1,4 @@
-/** Scoped additions for the alpha.2 pages without a conversation header. */
+/** Native materials and interactions around the official page headers. */
 const STYLES = `
 .dshNextSafeModeNotice{position:absolute;right:16px;bottom:16px;max-width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3);border-radius:10px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:12px/1.5 system-ui,sans-serif;pointer-events:auto;-webkit-app-region:no-drag}
 .dshNextSafeModeNotice p{margin:5px 0 8px}.dshNextSafeModeNotice button{font:inherit;border:1px solid currentColor;border-radius:5px;padding:4px 8px;background:transparent;color:inherit;cursor:pointer}
@@ -14,62 +14,35 @@ html[data-next-material='mica'][data-platform='win32'] :has(> [data-shell-overla
 html[data-next-material='mica'][data-platform='win32'] :has(> [data-shell-overlay]) > div:first-child {
   background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 60%, transparent);
 }
-/* Pass the official frame's live column sizes through the overlay without
-   changing its layout or any other overlay occupant. */
-html[data-platform='darwin'] [data-shell-overlay],
-html[data-platform='darwin'] [data-shell-overlay] > [data-slot='shell.overlay'] {
-  grid-template-columns: inherit;
+/* The stable main column owns an invisible caption region. The official page
+   and its title keep their original layout and scroll underneath it. */
+html[data-platform='darwin'] :has(> [data-shell-overlay]) > :has([data-plugin-panel]) {
+  position: relative;
+  isolation: isolate;
 }
-.dshNextWindowControls {
-  display: none;
+html[data-platform='darwin'] :has(> [data-shell-overlay]) > :has([data-plugin-panel])::before {
+  content: '';
   position: absolute;
   inset: 0 0 auto;
   height: 52px;
-  grid-template-columns: inherit;
-  pointer-events: none !important;
-}
-/* The upstream header already owns these controls when a Session exists. */
-html[data-platform='darwin'] :not(:has([data-conversation-header-leading])) > [data-shell-overlay] .dshNextWindowControls {
-  display: grid;
-}
-.dshNextWindowDrag {
-  grid-column: 2;
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
   -webkit-app-region: drag;
-  pointer-events: auto;
 }
-.dshNextSidebarOpen {
-  display: none;
-  position: absolute;
-  left: 88px;
-  top: 12px;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-}
-[data-sidebar-collapsed] .dshNextSidebarOpen { display: inline-flex; }
-.dshNextSidebarOpen:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.dshNextSidebarOpen:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: 2px;
-}
-/* Keep the plugin title, refresh/install buttons and detail/back controls
-   below the window strip, including while the page scrolls. */
-html[data-platform='darwin'] [data-plugin-panel] { padding-top: 64px; }
-:has(> [data-shell-overlay]):has([data-plugin-panel]) .dshNextWindowDrag {
-  background: var(--dsw-alias-bg-base);
-}
+html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-header-title] { flex: 1; min-width: 0; }
+html[data-platform='darwin'] [data-plugin-header-leading] { display: none; flex: none; }
+html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-header-leading] { display: flex; }
+html[data-platform='darwin'] [data-plugin-header-leading] [data-sidebar-header-controls] { padding-left: max(0px, calc(88px - clamp(24px, 4vw, 48px))); }
+html[data-platform='darwin'] [data-sidebar-collapsed] [data-plugin-page-header='detail'] { display: flex; align-items: center; gap: 16px; }
+/* These controls remain clickable even when scrolled into the caption region. */
+html[data-platform='darwin'] [data-plugin-panel] :is(button, a, input, textarea, select, label, summary, [contenteditable='true'], [role='button'], [role='switch'], [role='radio'], [role='checkbox'], [role='tab'], [role='menuitem'], [role='slider']),
+html[data-platform='darwin'] [data-plugin-header-leading] { -webkit-app-region: no-drag; }
 /* A modal or full-screen right pane owns its own input surface. */
-html:has([aria-modal='true']) .dshNextWindowControls,
-[data-rightbar-fullscreen] > [data-shell-overlay] .dshNextWindowControls { visibility: hidden; }
+html:has([aria-modal='true']) [data-conversation-title-row],
+html:has([aria-modal='true']) :has(> [data-shell-overlay]) > :has([data-plugin-panel])::before,
+[data-rightbar-fullscreen] [data-conversation-title-row],
+[data-rightbar-fullscreen]:has(> [data-shell-overlay]) > :has([data-plugin-panel])::before { -webkit-app-region: no-drag; }
 `
 
 export function installWindowStyles(): () => void {

@@ -15,7 +15,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   preferences = { ...DEFAULT_PREFERENCES }
   busy = false
-  selected = 'default'
+  selected = 'desktop'
   safeMode = false
   recoveryMode = false
   backend = { host: undefined }
@@ -25,7 +25,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   start = fixture.start
   close = fixture.close
   browserLinks() { return { localUrl: null, lanUrls: [] } }
-  state() { return { selected: 'default', profiles: ['default'], unavailableProfiles: [], features: { remoteControl: false, market: true },
+  state() { return { selected: 'desktop', profiles: ['desktop'], unavailableProfiles: [], features: { remoteControl: false, market: true },
     preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : fixture.phase, busy: this.busy, failure: 'Fixture Host failure', safeMode: false,
     home: 'temporary', browserUrl: null, lan: null, checkpoint: null, logs: '' } }
   report() {}
@@ -168,11 +168,18 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'restart-recovery' })
     expect(fixture.close).not.toHaveBeenCalled()
     let finishClose!: () => void
-    fixture.close.mockImplementationOnce(() => new Promise<void>(resolve => { finishClose = resolve }))
+    fixture.close.mockImplementationOnce(() => {
+      expect(fixture.windows.every(window => !window.visible)).toBe(true)
+      return new Promise<void>(resolve => { finishClose = resolve })
+    })
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'restart-recovery' })
     expect(fixture.close).toHaveBeenCalledOnce()
     expect(app.relaunch).not.toHaveBeenCalled()
     expect(tray.destroyed).toBe(true)
+    window.emit('ready-to-show')
+    controls.emit('ready-to-show')
+    app.emit('activate')
+    expect(fixture.windows.every(window => !window.visible)).toBe(true)
     finishClose()
     await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalledWith({ args: expect.arrayContaining(['--next-recovery']) }))
   } finally { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
@@ -196,6 +203,8 @@ it('boots directly into recovery without starting a Host or loading the official
     fixture.trays[0].menu[0].click()
     expect(fixture.windows).toHaveLength(1)
     expect(fixture.start).not.toHaveBeenCalled()
+    controls.visible = true
+    fixture.close.mockImplementationOnce(async () => { expect(controls.visible).toBe(false) })
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'quit' })
     await vi.waitFor(() => expect(fixture.close).toHaveBeenCalledOnce())
   } finally { process.argv.splice(0, process.argv.length, ...argv); vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
