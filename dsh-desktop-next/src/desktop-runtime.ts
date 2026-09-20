@@ -108,6 +108,10 @@ export class NextDesktopRuntime {
   /** Apply access toggles without stopping conversations or changing the renderer capability. */
   async applyPreferences(value: unknown): Promise<void> {
     const next = parsePreferences(value)
+    // A Host already being spawned has captured its boot policy. Apply after
+    // readiness instead of only saving a value that the running Host never sees.
+    if (this.backend.state.phase === 'starting' && !this.recoveryMode && !this.safeMode) await this.startup.catch(() => {})
+    if (this.closing) throw new Error('Next is shutting down')
     const previous = this.preferences
     const host = this.hostProcess
     const lan = this.lan

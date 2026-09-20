@@ -74,6 +74,24 @@ try {
   assert.equal(new URL(runtime.state().browserUrl).search, '')
   assert.equal(JSON.stringify(runtime.state()).includes(runtime.auth.token), false)
   assert.equal(JSON.stringify(runtime.state()).includes(new URL(runtime.auth.url).search), false)
+  // A slow certificate bootstrap leaves a live Host with its captured boot
+  // policy. A change made during startup must reach that Host after readiness.
+  let certificateStarted
+  let releaseCertificate
+  const preparingCertificate = new Promise(resolve => { certificateStarted = resolve })
+  const certificateGate = new Promise(resolve => { releaseCertificate = resolve })
+  runtime.options.certificate = async () => { certificateStarted(); await certificateGate; throw new Error('Fixture certificate unavailable') }
+  const starting = runtime.restart(() => runtime.writePreferences({ ...runtime.preferences, browserAccess: true, networkExposure: 'lan' }))
+  await preparingCertificate
+  let changedDuringStart = false
+  const changeDuringStart = runtime.applyPreferences({ ...runtime.preferences, browserAccess: false, networkExposure: 'loopback' }).then(() => { changedDuringStart = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(changedDuringStart, false, 'Changes made during startup wait for the captured Host policy')
+  releaseCertificate()
+  await Promise.all([starting, changeDuringStart])
+  const afterStartup = await fetch(new URL(runtime.auth.url).origin, { headers: { cookie: runtime.auth.cookie } })
+  assert.equal(afterStartup.status, 403, 'The running Host receives the preference saved while it was starting')
+  await afterStartup.body?.cancel()
   const dir = runtime.profiles.directory('default')
   await runtime.backend.stop()
   writeFileSync(join(dir, 'package.json'), '{ broken manifest')
