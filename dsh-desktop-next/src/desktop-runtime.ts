@@ -1,7 +1,7 @@
 /** Headless owner of the Host, desktop preferences, Profiles and recovery. */
 import { randomBytes } from 'node:crypto'
 import { mkdtempSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { cleanupDisposableTree } from '../../dsh-plugin-desktop-beta/src/disposable-tree.ts'
 import { join } from 'node:path'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
@@ -98,7 +98,7 @@ export class NextDesktopRuntime {
     await this.backend.stop()
     if (this.closing) return
     await change()
-    if (!this.safeMode) await this.cleanupSafeHome()
+    if (!this.safeMode) this.cleanupSafeHome()
     await this.start()
   }
 
@@ -197,20 +197,17 @@ export class NextDesktopRuntime {
   async close(): Promise<void> {
     this.closing = true
     await this.backend.close()
-    await this.cleanupSafeHome()
+    this.cleanupSafeHome()
     this.diagnostics.flush()
   }
 
-  private async cleanupSafeHome(): Promise<void> {
+  private cleanupSafeHome(): void {
     const home = this.safeHome
     if (!home) return
     this.safeHome = undefined
     try {
-      // Use async rm: Electron's Windows rmSync follows directory junctions
-      // into their targets and also fails on read-only files. Profiles link
-      // back to the application bundle, which must never be traversed here.
-      // Retry directory handles retained briefly after the Host exits.
-      await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+      // Share Stable/Beta's explicit junction unlinking and bounded retries.
+      cleanupDisposableTree(home)
     } catch (error) {
       // Temporary files must not prevent relaunch or returning to the original Profile.
       this.diagnostics.append(`Safe mode temporary directory cleanup failed (${home}): ${String(error)}`, 'warn')

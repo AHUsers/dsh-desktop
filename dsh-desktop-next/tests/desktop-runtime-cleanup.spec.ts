@@ -1,18 +1,18 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { cleanupDisposableTree } from '../../dsh-plugin-desktop-beta/src/disposable-tree.ts'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { NextDesktopRuntime } from '../src/desktop-runtime.ts'
 
-vi.mock('node:fs/promises', async importOriginal => ({
-  ...await importOriginal<typeof import('node:fs/promises')>(), rm: vi.fn(),
+vi.mock('../../dsh-plugin-desktop-beta/src/disposable-tree.ts', () => ({
+  cleanupDisposableTree: vi.fn(),
 }))
 
 const cleanup: (() => void)[] = []
 afterEach(() => {
   vi.restoreAllMocks()
-  vi.mocked(rm).mockReset()
+  vi.mocked(cleanupDisposableTree).mockReset()
   for (const dispose of cleanup.splice(0)) dispose()
 })
 
@@ -35,18 +35,18 @@ it('waits for Host shutdown before removing the safe home and completing close',
   const { runtime, safeHome } = await fixture()
   let finishStop!: () => void
   vi.spyOn(runtime.backend, 'close').mockImplementation(() => new Promise(resolve => { finishStop = resolve }))
-  vi.mocked(rm).mockImplementation(async path => { rmSync(path, { recursive: true, force: true }) })
+  vi.mocked(cleanupDisposableTree).mockImplementation(path => { rmSync(path, { recursive: true, force: true }); return true })
   const closing = runtime.close()
-  expect(rm).not.toHaveBeenCalled()
+  expect(cleanupDisposableTree).not.toHaveBeenCalled()
   finishStop()
   await closing
   expect(existsSync(safeHome)).toBe(false)
-  expect(rm).toHaveBeenCalledWith(safeHome, expect.objectContaining({ maxRetries: 3, retryDelay: 100 }))
+  expect(cleanupDisposableTree).toHaveBeenCalledWith(safeHome)
 })
 
 it.each(['EPERM', 'EBUSY'])('allows relaunch after %s cleaning the safe home and persists a warning', async code => {
   const { runtime, safeHome } = await fixture()
-  vi.mocked(rm).mockRejectedValue(Object.assign(new Error(`${code}: directory is locked`), { code }))
+  vi.mocked(cleanupDisposableTree).mockImplementation(() => { throw Object.assign(new Error(`${code}: directory is locked`), { code }) })
   await expect(runtime.close()).resolves.toBeUndefined()
   expect(existsSync(safeHome)).toBe(true)
   expect(readFileSync(runtime.diagnostics.file, 'utf8')).toContain(`${code}: directory is locked`)
@@ -55,7 +55,7 @@ it.each(['EPERM', 'EBUSY'])('allows relaunch after %s cleaning the safe home and
 
 it('returns to the original Profile despite a locked safe home and creates a fresh home next time', async () => {
   const { runtime, home, safeHome } = await fixture()
-  vi.mocked(rm).mockRejectedValue(Object.assign(new Error('EPERM'), { code: 'EPERM' }))
+  vi.mocked(cleanupDisposableTree).mockImplementation(() => { throw Object.assign(new Error('EPERM'), { code: 'EPERM' }) })
   await expect(runtime.restart(() => { runtime.safeMode = false })).resolves.toBeUndefined()
   expect(runtime.terminalTarget().homeDir).toBe(home)
   await runtime.restart(() => { runtime.safeMode = true })
@@ -66,6 +66,6 @@ it('still rejects close when the Host cannot stop and leaves its safe home intac
   const { runtime, safeHome } = await fixture()
   vi.spyOn(runtime.backend, 'close').mockRejectedValue(new Error('Host did not exit'))
   await expect(runtime.close()).rejects.toThrow('Host did not exit')
-  expect(rm).not.toHaveBeenCalled()
+  expect(cleanupDisposableTree).not.toHaveBeenCalled()
   expect(existsSync(safeHome)).toBe(true)
 })
