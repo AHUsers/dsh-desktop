@@ -39,6 +39,57 @@ it('isolates profile configuration and preserves existing files on ensure', () =
   expect(readFileSync(join(first, 'cordis.patch.yml'), 'utf8')).toBe('# user patch\n[]\n')
   expect(() => manager.create('work')).toThrow()
 })
+
+it('records onboarding per Profile together with its plugin choices and retains unrelated configuration', () => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  manager.create('work')
+  const file = join(dir, 'package.json')
+  const manifest = JSON.parse(readFileSync(file, 'utf8'))
+  manifest.dsh.profile.bundles.push('my-plugin')
+  manifest.dependencies = { 'my-plugin': '1.0.0' }
+  manifest.custom = 'keep'
+  writeFileSync(file, JSON.stringify(manifest))
+  expect(manager.onboardingRequired('desktop')).toBe(true)
+  manager.finishOnboarding('desktop', { market: false, dshMarket: true, remoteControl: true })
+  const reread = new NextProfiles(manager.home)
+  reread.ensure('desktop')
+  expect(reread.onboardingRequired('desktop')).toBe(false)
+  expect(reread.onboardingRequired('work')).toBe(true)
+  expect(reread.features('desktop')).toEqual({ market: false, dshMarket: true, remoteControl: true })
+  expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+    custom: 'keep', dependencies: manifest.dependencies,
+    dsh: { desktopNextOnboarding: { version: 1, outcome: 'completed' }, profile: { bundles: expect.arrayContaining(['my-plugin']) } },
+  })
+  manager.select('work'); manager.select('desktop')
+  expect(manager.onboardingRequired('desktop')).toBe(false)
+})
+
+it('skips onboarding without changing current choices, while a recreated Profile starts fresh', () => {
+  const manager = profiles()
+  const dir = manager.create('work')
+  manager.setFeatures('work', { market: false, dshMarket: true, remoteControl: true })
+  manager.finishOnboarding('work')
+  expect(manager.onboardingRequired('work')).toBe(false)
+  expect(manager.features('work')).toEqual({ market: false, dshMarket: true, remoteControl: true })
+  expect(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dsh.desktopNextOnboarding.outcome).toBe('skipped')
+  rmSync(dir, { recursive: true })
+  manager.create('work')
+  expect(manager.onboardingRequired('work')).toBe(true)
+})
+
+it.each([
+  { market: true, dshMarket: true, remoteControl: false },
+  { market: true, remoteControl: 'yes' },
+  { market: false, remoteControl: false, extra: true },
+])('leaves onboarding incomplete and configuration untouched on invalid choices %j', value => {
+  const manager = profiles()
+  const file = join(manager.ensure('desktop'), 'package.json')
+  const original = readFileSync(file, 'utf8')
+  expect(() => manager.finishOnboarding('desktop', value)).toThrow()
+  expect(readFileSync(file, 'utf8')).toBe(original)
+  expect(manager.onboardingRequired('desktop')).toBe(true)
+})
 it('refuses a symlinked profile before writing outside Next home', () => {
   const manager = profiles()
   const outside = profiles()
@@ -59,10 +110,12 @@ it('recovers without parsing broken patches or deleting plugin packages and home
   mkdirSync(join(dir, 'node_modules', 'missing-third-party-plugin'), { recursive: true })
   writeFileSync(join(dir, 'node_modules', 'missing-third-party-plugin', 'keep'), 'plugin')
   manager.setFeatures('desktop', { remoteControl: true, market: true })
+  manager.finishOnboarding('desktop')
   const backup = await manager.recover('desktop')
   expect(readFileSync(backup!, 'utf8')).toBe(broken)
   expect(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dsh.profile.bundles).toEqual(WEB_BUNDLES)
   expect(manager.features('desktop')).toEqual({ remoteControl: false, market: false })
+  expect(manager.onboardingRequired('desktop')).toBe(false)
   expect(readFileSync(join(dir, 'node_modules', 'missing-third-party-plugin', 'keep'), 'utf8')).toBe('plugin')
   expect(readFileSync(join(manager.home, 'cordis.patch.yml'), 'utf8')).toContain('keep home patch')
 })

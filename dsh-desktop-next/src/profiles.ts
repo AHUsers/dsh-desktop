@@ -17,6 +17,23 @@ export const DSH_MARKET_PACKAGE = 'dshmarket'
 export interface Features { remoteControl: boolean; market: boolean; dshMarket?: boolean }
 export const DEFAULT_FEATURES: Readonly<Features> = { remoteControl: false, market: true }
 
+interface ProfileManifest {
+  dsh: {
+    desktopNextPlugins?: number
+    desktopNextOnboarding?: { version: number; outcome: 'completed' | 'skipped' }
+    profile: { bundles: string[] }
+  }
+  [key: string]: unknown
+}
+
+function applyFeatures(manifest: ProfileManifest, features: Features): void {
+  const optional = [AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE]
+  manifest.dsh.profile.bundles = [...manifest.dsh.profile.bundles.filter(name => !optional.includes(name)),
+    ...(features.market ? [COMMUNITY_MARKET_PACKAGE] : []), ...(features.dshMarket ? [DSH_MARKET_PACKAGE] : []),
+    ...(features.remoteControl ? [AA_PACKAGE] : [])]
+  manifest.dsh.desktopNextPlugins = 1
+}
+
 export function profileName(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u.test(value)
     || /^(?:node_modules|con|prn|aux|nul|com[1-9]|lpt[1-9])$/iu.test(value)) {
@@ -103,11 +120,22 @@ export class NextProfiles {
   setFeatures(name: string, value: unknown): void {
     const features = parseFeatures(value)
     const manifest = this.manifest(name)
-    const optional = [AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE]
-    manifest.dsh.profile.bundles = [...manifest.dsh.profile.bundles.filter(name => !optional.includes(name)),
-      ...(features.market ? [COMMUNITY_MARKET_PACKAGE] : []), ...(features.dshMarket ? [DSH_MARKET_PACKAGE] : []),
-      ...(features.remoteControl ? [AA_PACKAGE] : [])]
-    manifest.dsh.desktopNextPlugins = 1
+    applyFeatures(manifest, features)
+    atomicJson(join(this.directory(name), 'package.json'), manifest)
+  }
+  onboardingRequired(name: string): boolean {
+    const saved = this.manifest(name).dsh.desktopNextOnboarding
+    return saved?.version !== 1 || !['completed', 'skipped'].includes(saved.outcome)
+  }
+  /** One atomic write stores both the choices and completion in this Profile. Skip preserves its choices. */
+  finishOnboarding(name: string, value?: unknown): void {
+    const manifest = this.manifest(name)
+    if (value !== undefined) {
+      const features = parseFeatures(value)
+      if (features.market && features.dshMarket) throw new Error('Select only one plugin market')
+      applyFeatures(manifest, features)
+    }
+    manifest.dsh.desktopNextOnboarding = { version: 1, outcome: value === undefined ? 'skipped' : 'completed' }
     atomicJson(join(this.directory(name), 'package.json'), manifest)
   }
   /** Once per Profile, preserve the old choices without overriding future plugin-manager edits. */
@@ -116,7 +144,7 @@ export class NextProfiles {
     if (manifest.dsh.desktopNextPlugins === 1) return
     this.setFeatures(name, { ...this.features(name), dshMarket: manifest.dsh.profile.bundles.includes(DSH_MARKET_PACKAGE) })
   }
-  private manifest(name: string): { dsh: { desktopNextPlugins?: number; profile: { bundles: string[] } }; [key: string]: unknown } {
+  private manifest(name: string): ProfileManifest {
     const value = JSON.parse(readPrivateFile(join(this.directory(name), 'package.json')) ?? 'null')
     if (!value || !Array.isArray(value.dsh?.profile?.bundles) || value.dsh.profile.bundles.some((item: unknown) => typeof item !== 'string')) throw new Error('Invalid Next Profile manifest')
     return value
@@ -133,7 +161,9 @@ export class NextProfiles {
         if (value && typeof value === 'object' && !Array.isArray(value)) manifest = value as Record<string, unknown>
       } catch { /* The original bytes have already been backed up. */ }
       // Keep installed dependencies, but remove malformed activation metadata.
-      manifest.dsh = { profile: { bundles: WEB_BUNDLES } }
+      const onboarding = (manifest.dsh as Partial<ProfileManifest['dsh']> | undefined)?.desktopNextOnboarding
+      manifest.dsh = { profile: { bundles: WEB_BUNDLES },
+        ...(onboarding?.version === 1 && ['completed', 'skipped'].includes(onboarding.outcome) ? { desktopNextOnboarding: onboarding } : {}) }
       atomicJson(join(dir, 'package.json'), manifest)
       atomicText(join(dir, 'cordis.patch.yml'), '[]\n')
       this.setFeatures(name, { remoteControl: false, market: false })

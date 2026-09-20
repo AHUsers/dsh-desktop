@@ -11,6 +11,7 @@ import { desktopRecoveryCopy } from '../../../dsh-plugin-desktop-beta/src/recove
 import { useDesktopState } from '../client/desktop-state.ts'
 import { NextSettingsAdapter } from '../client/settings-adapter.ts'
 import type { DesktopCommand } from '../desktop-contract.ts'
+import { Onboarding } from './onboarding.tsx'
 import './theme.css'
 
 function App() {
@@ -58,6 +59,7 @@ function NativePages({ adapter }: { adapter: NextSettingsAdapter }) {
     return () => document.removeEventListener('click', navigate)
   }, [adapter, busy])
   if (!state) return <><DesktopFrame /><main className="dshNativeContent p-6"><Alert><AlertDescription>{t('正在读取桌面状态…', 'Loading Desktop state…')}</AlertDescription></Alert></main></>
+  if (page === 'onboarding') return <Onboarding key={state.selected} state={state} locale={locale} bridge={adapter.bridge} />
   if (page === 'create-profile') return <ProfileCreateApp onCancel={() => { void perform({ type: 'close-controls' }) }} onCreate={async name => {
     await adapter.command({ type: 'create', name })
     await adapter.command({ type: 'switch', name })
@@ -68,7 +70,7 @@ function NativePages({ adapter }: { adapter: NextSettingsAdapter }) {
   const notice = failure ? { tone: 'error' as const, title: t('操作未完成', 'Action failed'), body: failure } : undefined
   const profiles = state.profiles.map(name => ({ name, current: name === state.selected, selectable: !state.unavailableProfiles.includes(name) }))
   if (page === 'profiles') return <ProfileSelectorApp state={{ locale, profiles, busy: busy || state.busy, restartReady: false, ...(notice ? { notice } : {}) }} />
-  // Only recovery and Profile tools have separate windows. Settings live in the app.
+  // Recovery, first-run setup and Profile tools work without a Host. Settings live in the app.
   const copy = { ...desktopRecoveryCopy(locale),
     quickRecoveryBody: t('选择适合当前问题的恢复方式。可以尝试安全模式，修复或回滚配置，或切换 Profile。', 'Try safe mode, repair or restore the configuration, or switch Profiles.'),
     safeModeBody: t('使用独立的临时环境，不载入原环境的插件、补丁和凭据。退出后移除临时数据，返回原 Profile。', 'Use a temporary environment without the original plugins, patches or credentials. Leaving removes temporary data and returns to the original Profile.'),
