@@ -74,6 +74,7 @@ export type DesktopCommand =
     | 'diagnostics' | 'open-browser' | 'open-lan' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }
 
 export interface DesktopBridge {
+  readonly sidebarBrowser?: import('./sidebar-browser-contract.ts').SidebarBrowserBridge
   readonly permissions?: DesktopPermissions
   /** Native menu/Host requests, delivered only to the main app. */
   onOpenSettings?(listener: (page: DesktopSettingsPage) => void): () => void
