@@ -44,7 +44,7 @@ export interface DesktopState {
   busy: boolean
   failure: string
   safeMode: boolean
-  /** The selected Profile is awaiting its first-run choices; no Host has started. */
+  /** The selected Profile is in setup (first run or reopened); no Host has started. */
   onboarding?: boolean
   /** Initial saved choice for the Host-independent wizard; live state belongs to pluginManager. */
   onboardingComputerUse?: boolean
@@ -74,7 +74,7 @@ export type DesktopCommand =
   | { type: 'features'; features: Features }
   | { type: 'preferences'; preferences: DesktopPreferences }
   | { type: 'controls'; page?: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' }
-  | { type: 'restart-app' | 'restart-recovery' | 'close-controls' }
+  | { type: 'restart-app' | 'restart-recovery' | 'restart-onboarding' | 'close-controls' }
   | { type: 'restart' | 'recover' | 'safe-mode' | 'normal-mode' | 'rollback' | 'repair-global'
     | 'reload' | 'devtools' | 'terminal' | 'open-home' | 'open-profile' | 'open-logs' | 'open-backups'
     | 'diagnostics' | 'open-browser' | 'open-lan' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }

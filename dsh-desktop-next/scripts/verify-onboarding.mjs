@@ -75,7 +75,10 @@ try {
   await page.getByRole('switch', { name: '启用远程控制', exact: true }).check()
   assert.equal(await page.locator('.next-onboarding-copy [role="switch"]').count(), 1)
   assert.equal(await page.locator('.next-onboarding-panel [role="switch"]').count(), 0)
-  assert.equal(await page.locator('.next-onboarding-phone img').evaluate(image => image.complete && image.naturalWidth > 0), true)
+  await page.waitForFunction(() => {
+    const images = [...document.querySelectorAll('.next-onboarding-devices img')]
+    return images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0)
+  })
   await capture('remote')
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await page.locator('[data-page="1"]').waitFor()
@@ -137,10 +140,15 @@ try {
     assert.deepEqual(commands.at(-1), { type: 'onboarding-skip', profile: 'desktop' })
   }
   assert.equal(commands.length, 6)
-  // Existing saved provider choices are reflected when an incomplete wizard is reopened.
+  // Reopening setup preselects all of the current Profile's saved choices.
+  state.features = { market: false, dshMarket: true, remoteControl: true }
   state.onboardingComputerUse = true
   await open()
-  for (let step = 1; step <= 3; step++) await next(step)
+  await next(1)
+  assert.equal(await page.getByRole('radio', { name: 'dsh-market', exact: true }).getAttribute('aria-checked'), 'true')
+  await next(2)
+  assert.equal(await page.getByRole('switch', { name: '启用远程控制', exact: true }).getAttribute('aria-checked'), 'true')
+  await next(3)
   assert.equal(await cuaSwitch.getAttribute('aria-checked'), 'true')
 
   // Small windows remain scrollable; light theme and English share the same flow.

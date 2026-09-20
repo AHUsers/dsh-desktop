@@ -44,9 +44,10 @@ it('keeps valid escape routes during failure or safe mode and only advertises su
   expect(desktopMenu({ ...state, browserUrl: 'http://127.0.0.1:1234' }, 'en', vi.fn(), vi.fn()).some(item => item.label === 'Open in Browser')).toBe(true)
 })
 
-it('preserves application arguments while replacing one-shot recovery and safe-mode flags', () => {
-  const argv = ['/fixture/lib/main.js', '--next-recovery', '--next-safe-mode', '--example=value']
-  expect(relaunchArguments(argv, true, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-recovery'])
-  expect(relaunchArguments(argv, false, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-safe-mode'])
+it('preserves application arguments while replacing one-shot launch modes', () => {
+  const argv = ['/fixture/lib/main.js', '--next-recovery', '--next-safe-mode', '--next-onboarding', '--example=value']
+  expect(relaunchArguments(argv, true, true, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-recovery'])
+  expect(relaunchArguments(argv, false, true, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-safe-mode'])
+  expect(relaunchArguments(argv, false, false, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-onboarding'])
   expect(relaunchArguments(argv, false, false)).toEqual(['/fixture/lib/main.js', '--example=value'])
 })

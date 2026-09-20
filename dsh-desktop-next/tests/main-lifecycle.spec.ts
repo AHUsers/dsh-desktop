@@ -35,7 +35,7 @@ vi.mock('../src/desktop-runtime.ts', async () => { const { NextProfiles } = awai
   close = fixture.close
   restart = fixture.restart
   browserLinks() { return { localUrl: null, lanUrls: [] } }
-  state() { return { selected: 'desktop', profiles: ['desktop'], unavailableProfiles: [], features: { remoteControl: false, market: true },
+  state() { return { selected: 'desktop', profiles: ['desktop'], unavailableProfiles: [], features: fixture.corruptProfile ? { remoteControl: false, market: true } : this.profiles.features(this.selected),
     preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : fixture.phase, busy: this.busy, failure: 'Fixture Host failure', safeMode: this.safeMode,
     home: 'temporary', browserUrl: null, lan: null, checkpoint: null, logs: '' } }
   report() {}
@@ -306,12 +306,89 @@ it.each(['complete', 'skip'] as const)('shows first-run onboarding without a Hos
   } finally { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
 })
 
+it('reopens setup through a confirmed relaunch without resetting the Profile or stopping the Host before hiding windows', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'next-onboarding-relaunch-'))
+  vi.stubEnv('DSH_DESKTOP_NEXT_HOME', home)
+  try {
+    await import('../src/main.ts')
+    await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
+    const window = fixture.windows[0]
+    const sender = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+    const command = fixture.handlers.get('dsh-next:command')!
+    const manager = new NextProfiles(home)
+    manager.finishOnboarding('desktop', { features: { market: false, dshMarket: true, remoteControl: true }, computerUse: true })
+    const { app, dialog } = await import('electron')
+    window.visible = true
+    vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false })
+    await command(sender, { type: 'restart-onboarding' })
+    expect(app.quit).not.toHaveBeenCalled()
+    expect(window.visible).toBe(true)
+    expect(fixture.close).not.toHaveBeenCalled()
+    let finishClose!: () => void
+    fixture.close.mockImplementationOnce(() => {
+      expect(window.visible).toBe(false)
+      return new Promise<void>(resolve => { finishClose = resolve })
+    })
+    await command(sender, { type: 'restart-onboarding' })
+    expect(fixture.close).toHaveBeenCalledOnce()
+    expect(app.relaunch).not.toHaveBeenCalled()
+    expect(manager.onboardingRequired('desktop')).toBe(false)
+    expect(manager.features('desktop')).toEqual({ market: false, dshMarket: true, remoteControl: true })
+    expect(manager.computerUseEnabled('desktop')).toBe(true)
+    finishClose()
+    await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalledWith({ args: expect.arrayContaining(['--next-onboarding']) }))
+    expect(fixture.start).toHaveBeenCalledOnce()
+  } finally { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
+})
+
+it.each(['complete', 'skip', 'close'] as const)('reopens a completed Profile with its saved choices and handles %s', async outcome => {
+  const home = mkdtempSync(join(tmpdir(), 'next-onboarding-reopen-'))
+  vi.stubEnv('DSH_DESKTOP_NEXT_HOME', home)
+  const argv = [...process.argv]
+  process.argv.push('--next-onboarding')
+  try {
+    const manager = new NextProfiles(home)
+    manager.ensure('desktop')
+    const features = { market: false, dshMarket: true, remoteControl: true }
+    manager.finishOnboarding('desktop', { features, computerUse: true })
+    await import('../src/main.ts')
+    await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
+    const window = fixture.windows[0]
+    const sender = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+    const command = fixture.handlers.get('dsh-next:command')!
+    expect(window.webContents.mainFrame.url).toMatch(/#onboarding$/)
+    expect(fixture.start).not.toHaveBeenCalled()
+    expect(fixture.handlers.get('dsh-next:state')!(sender)).toMatchObject({ onboarding: true, onboardingComputerUse: true, features })
+    // Reopening is a launch mode, not a deletion of the completion record.
+    expect(manager.onboardingRequired('desktop')).toBe(false)
+    if (outcome === 'close') {
+      window.close()
+      expect(fixture.start).not.toHaveBeenCalled()
+    } else {
+      await command(sender, outcome === 'skip' ? { type: 'onboarding-skip', profile: 'desktop' }
+        : { type: 'onboarding-complete', profile: 'desktop', features: { market: true, remoteControl: false }, computerUse: false })
+      expect(fixture.start).toHaveBeenCalledOnce()
+      expect(fixture.windows[1].webContents.mainFrame.url).toBe('dsh-app://app/')
+    }
+    expect(manager.features('desktop')).toEqual(outcome === 'complete' ? { market: true, remoteControl: false } : features)
+    expect(manager.computerUseEnabled('desktop')).toBe(outcome !== 'complete')
+    expect(manager.onboardingRequired('desktop')).toBe(false)
+    if (outcome !== 'close') {
+      const { app } = await import('electron')
+      const main = fixture.windows[1]
+      await command({ sender: main.webContents, senderFrame: main.webContents.mainFrame }, { type: 'restart-app' })
+      await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalled())
+      expect(vi.mocked(app.relaunch).mock.calls[0]![0]!.args).not.toContain('--next-onboarding')
+    }
+  } finally { process.argv.splice(0, process.argv.length, ...argv); vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
+})
+
 it.each(['--next-recovery', '--next-safe-mode'])('keeps %s independent of onboarding and clears its flag when switching Profiles', async mode => {
   const home = mkdtempSync(join(tmpdir(), 'next-onboarding-bypass-'))
   vi.stubEnv('DSH_DESKTOP_NEXT_HOME', home)
   fixture.needsOnboarding = true
   const argv = [...process.argv]
-  process.argv.push(mode)
+  process.argv.push(mode, '--next-onboarding')
   try {
     await import('../src/main.ts')
     await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
@@ -323,11 +400,13 @@ it.each(['--next-recovery', '--next-safe-mode'])('keeps %s independent of onboar
     expect(fixture.handlers.get('dsh-next:state')!(sender).onboarding).toBe(false)
     const command = fixture.handlers.get('dsh-next:command')!
     await expect(command(sender, { type: 'onboarding-skip', profile: 'desktop' })).rejects.toThrow('unavailable')
+    await expect(command(sender, { type: 'restart-onboarding' })).rejects.toThrow('unavailable')
     manager.create('work')
     await command(sender, { type: 'switch', name: 'work' })
     const { app } = await import('electron')
     await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalled())
     expect(vi.mocked(app.relaunch).mock.calls[0]![0]!.args).not.toContain(mode)
+    expect(vi.mocked(app.relaunch).mock.calls[0]![0]!.args).not.toContain('--next-onboarding')
     expect(manager.active).toBe('work')
   } finally { process.argv.splice(0, process.argv.length, ...argv); vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
 })
