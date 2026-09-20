@@ -11,12 +11,12 @@ export function DesktopPermissionsSection({ service, language }: { service: Desk
   </section>
 }
 
-export function DesktopPermissionsButton({ service, language, iconOnly = false }: { service?: DesktopPermissions; language: string; iconOnly?: boolean }) {
+export function DesktopPermissionsButton({ service, language, iconOnly = false, disabled = false }: { service?: DesktopPermissions; language: string; iconOnly?: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const zh = language.startsWith('zh')
   const label = zh ? '授权设置' : 'Permissions'
   return <>
-    <Button variant={iconOnly ? 'ghost' : 'outline'} size="sm" aria-label={label} title={label}
+    <Button variant={iconOnly ? 'ghost' : 'outline'} size="sm" aria-label={label} title={label} disabled={disabled}
       className={iconOnly ? 'dshNextSettingsGear' : undefined} icon={iconOnly ? <IconSettingsOutline16 /> : undefined}
       onClick={() => { setOpen(true) }}>{iconOnly ? null : label}</Button>
     <DesktopPermissionsDialog open={open} onClose={() => { setOpen(false) }} service={service} language={language} />
@@ -25,11 +25,30 @@ export function DesktopPermissionsButton({ service, language, iconOnly = false }
 
 export function DesktopPermissionsDialog({ open, onClose, service, language }: { open: boolean; onClose(): void; service?: DesktopPermissions; language: string }) {
   const zh = language.startsWith('zh')
+  const body = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const dialog = open ? body.current?.closest<HTMLElement>('[role="dialog"]') : null
+    if (!dialog) return
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const buttons = () => [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
+    const trapTab = (event: KeyboardEvent): void => {
+      if (event.key !== 'Tab') return
+      const targets = buttons()
+      const first = targets[0], last = targets.at(-1)
+      if (!targets.includes(document.activeElement as HTMLButtonElement) || event.shiftKey && document.activeElement === first || !event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); (event.shiftKey ? last : first)?.focus()
+      }
+    }
+    buttons()[0]?.focus()
+    document.addEventListener('keydown', trapTab)
+    return () => { document.removeEventListener('keydown', trapTab); previous?.focus({ preventScroll: true }) }
+  }, [open])
   return <Modal open={open} onClose={onClose} title={zh ? '系统权限' : 'System permissions'}
       closeLabel={zh ? '关闭' : 'Close'} className="dshNextPermissionsDialog"
       description={zh ? '按需授权。更改系统权限后，可能需要重启应用。' : 'Grant access when needed. You may need to restart the app after changing system permissions.'}>
-      {open && (service ? <PermissionDetails service={service} language={language} />
+      <div ref={body}>{open && (service ? <PermissionDetails service={service} language={language} />
         : <p role="status">{zh ? '请在运行 DSH 的桌面应用中管理系统权限。' : 'Manage system permissions in the desktop app running DSH.'}</p>)}
+      </div>
     </Modal>
 }
 

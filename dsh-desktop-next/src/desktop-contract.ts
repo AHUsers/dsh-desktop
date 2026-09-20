@@ -1,5 +1,5 @@
 /** General renderer state omits credentials; browser login links use a separate native operation. */
-import type { Features } from './profiles.ts'
+import type { Features, OnboardingChoices } from './profiles.ts'
 import type { DesktopLanHttpsRuntimeSnapshot } from './lan-https-runtime.ts'
 import type { DesktopPermissions } from './permissions.ts'
 
@@ -46,6 +46,8 @@ export interface DesktopState {
   safeMode: boolean
   /** The selected Profile is awaiting its first-run choices; no Host has started. */
   onboarding?: boolean
+  /** Initial saved choice for the Host-independent wizard; live state belongs to pluginManager. */
+  onboardingComputerUse?: boolean
   home: string
   platform: string
   version: string
@@ -65,7 +67,7 @@ export interface DesktopBrowserLinks {
 }
 
 export type DesktopCommand =
-  | { type: 'onboarding-complete'; profile: string; features: Features }
+  | ({ type: 'onboarding-complete'; profile: string } & OnboardingChoices)
   | { type: 'onboarding-skip'; profile: string }
   | { type: 'open-browser-url' | 'copy-browser-url'; url: string }
   | { type: 'create' | 'switch' | 'delete'; name: string }

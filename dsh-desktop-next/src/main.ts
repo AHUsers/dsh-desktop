@@ -42,6 +42,7 @@ let shellWindow: BrowserWindow | undefined
 let pendingSettings: DesktopSettingsPage | undefined
 let quitting = false
 let onboarding = false
+let onboardingComputerUse = false
 let relaunch: string[] | undefined
 let ownsInstance = false
 let windowsLanguage = 'en'
@@ -76,7 +77,7 @@ const native = new NativeDesktop({ root, language: () => windowsLanguage, state,
 const permissions = createNativePermissions()
 
 function state(): DesktopState {
-  return { ...runtime.state(), onboarding, platform: process.platform, version,
+  return { ...runtime.state(), onboarding, ...(onboarding ? { onboardingComputerUse } : {}), platform: process.platform, version,
     trayAvailable: native.available, notificationsAvailable: Notification.isSupported(), windowsMicaSupported: process.platform === 'win32' && supportsMica() }
 }
 function run(value: DesktopCommand): void { void command(value).catch(error => runtime.report(error)) }
@@ -212,7 +213,8 @@ async function command(value: unknown): Promise<void> {
     if (type === 'onboarding-complete' || type === 'onboarding-skip') {
       if (!onboarding || runtime.safeMode || runtime.recoveryMode || input.profile !== runtime.selected) throw new Error('Onboarding is unavailable for this Profile')
       // The Host has not loaded this Profile yet. Commit choices before starting it.
-      runtime.profiles.finishOnboarding(runtime.selected, type === 'onboarding-complete' ? parseFeatures(input.features) : undefined)
+      runtime.profiles.finishOnboarding(runtime.selected, type === 'onboarding-complete'
+        ? { features: input.features, computerUse: input.computerUse } : undefined)
       onboarding = false
       shellWindow?.hide()
       void runtime.start().catch(() => {})
@@ -432,7 +434,9 @@ async function main(): Promise<void> {
     try {
       runtime.profiles.ensure(runtime.selected)
       onboarding = runtime.profiles.onboardingRequired(runtime.selected)
+      if (onboarding) onboardingComputerUse = runtime.profiles.computerUseEnabled(runtime.selected)
     } catch (error) {
+      onboarding = false
       runtime.recoveryMode = true
       runtime.report(error)
     }

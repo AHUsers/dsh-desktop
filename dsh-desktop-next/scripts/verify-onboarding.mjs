@@ -19,16 +19,30 @@ page.on('pageerror', error => errors.push(error.message))
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
 let rejectSave = false
 const commands = []
+const permissionCalls = []
+const grants = { screen: 'not-determined', accessibility: 'denied', microphone: 'granted' }
 const state = {
   selected: 'desktop', profiles: ['desktop'], unavailableProfiles: [], features: { market: true, remoteControl: false },
-  preferences: {}, phase: 'starting', busy: false, failure: '', safeMode: false, onboarding: true, logs: '',
+  preferences: {}, phase: 'starting', busy: false, failure: '', safeMode: false, onboarding: true, onboardingComputerUse: false, logs: '',
 }
 await page.exposeFunction('__state', () => structuredClone(state))
 await page.exposeFunction('__command', command => {
   if (rejectSave) { rejectSave = false; throw new Error('Fixture: could not save Profile') }
   commands.push(command)
 })
-await page.addInitScript(() => { window.desktopNext = { state: () => window.__state(), command: value => window.__command(value) } })
+await page.exposeFunction('__permission', (action, permission) => {
+  permissionCalls.push({ action, permission })
+  if (action === 'request') grants[permission] = 'granted'
+  return { permission, status: grants[permission], canRequest: grants[permission] === 'not-determined', canOpenSettings: true }
+})
+await page.addInitScript(() => { window.desktopNext = {
+  state: () => window.__state(), command: value => window.__command(value),
+  permissions: {
+    query: permission => window.__permission('query', permission),
+    request: permission => window.__permission('request', permission),
+    openSettings: permission => window.__permission('openSettings', permission),
+  },
+} })
 await page.route('http://next-onboarding.test/**', async route => {
   const response = await serveWebDocument(new Request(route.request().url()), join(root, 'lib/native-ui'), false)
   response.headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; frame-src 'none'; base-uri 'none'")
@@ -69,6 +83,38 @@ try {
   await next(2)
   assert.equal(await page.getByRole('switch', { name: '启用远程控制', exact: true }).getAttribute('aria-checked'), 'true')
   await next(3)
+  const cuaSwitch = page.getByRole('switch', { name: '启用 Computer Use', exact: true })
+  assert.equal(await cuaSwitch.getAttribute('aria-checked'), 'false')
+  await cuaSwitch.check()
+  const gear = page.getByRole('button', { name: '授权设置', exact: true })
+  assert.ok((await gear.boundingBox()).x < (await cuaSwitch.boundingBox()).x)
+  assert.deepEqual(permissionCalls, [])
+  await capture('computer-use')
+  await gear.click()
+  const permissions = page.getByRole('dialog', { name: '系统权限', exact: true })
+  await permissions.waitFor()
+  const screen = permissions.getByRole('group', { name: '屏幕录制', exact: true })
+  await screen.getByText('尚未授权', { exact: true }).waitFor()
+  assert.equal(permissionCalls.length, 3)
+  assert.ok(permissionCalls.every(call => call.action === 'query'))
+  await capture('computer-use-permissions')
+  await screen.getByRole('button', { name: '请求授权', exact: true }).click()
+  await screen.getByText('已允许', { exact: true }).waitFor()
+  await permissions.getByRole('group', { name: '辅助功能', exact: true }).getByRole('button', { name: '打开系统设置', exact: true }).click()
+  assert.deepEqual(permissionCalls.filter(call => call.action !== 'query'), [
+    { action: 'request', permission: 'screen' }, { action: 'openSettings', permission: 'accessibility' },
+  ])
+  await page.keyboard.press('Tab')
+  assert.equal(await permissions.evaluate(dialog => dialog.contains(document.activeElement)), true,
+    await page.evaluate(() => document.activeElement?.outerHTML))
+  await page.keyboard.press('Escape')
+  await permissions.waitFor({ state: 'hidden' })
+  assert.equal(await gear.evaluate(button => document.activeElement === button), true)
+  await page.getByRole('button', { name: '上一步', exact: true }).click()
+  await page.locator('[data-page="2"]').waitFor()
+  await next(3)
+  assert.equal(await cuaSwitch.getAttribute('aria-checked'), 'true')
+  await next(4)
   await capture('recovery')
   assert.deepEqual(commands, [])
   rejectSave = true
@@ -76,41 +122,57 @@ try {
   await page.getByRole('alert').filter({ hasText: 'Fixture: could not save Profile' }).waitFor()
   await page.getByRole('button', { name: '完成并开始', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('main').getAttribute('aria-busy') === 'true')
-  assert.deepEqual(commands, [{ type: 'onboarding-complete', profile: 'desktop', features: { market: false, dshMarket: true, remoteControl: true } }])
+  assert.deepEqual(commands, [{ type: 'onboarding-complete', profile: 'desktop', computerUse: true, features: { market: false, dshMarket: true, remoteControl: true } }])
 
   // Skip is available on every page and does not submit partially edited choices.
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  for (let index = 0; index < 4; index++) {
+  for (let index = 0; index < 5; index++) {
     await open()
     for (let step = 1; step <= index; step++) await next(step)
     if (index === 1) await page.getByRole('radio', { name: '暂不开启', exact: true }).check()
     if (index === 2) await page.getByRole('switch', { name: '启用远程控制', exact: true }).check()
+    if (index === 3) await cuaSwitch.check()
     assert.equal(await page.locator('.next-onboarding-slide').evaluate(element => getComputedStyle(element).animationName), 'none')
     await page.getByRole('button', { name: '跳过全部', exact: true }).click()
     assert.deepEqual(commands.at(-1), { type: 'onboarding-skip', profile: 'desktop' })
   }
-  assert.equal(commands.length, 5)
+  assert.equal(commands.length, 6)
+  // Existing saved provider choices are reflected when an incomplete wizard is reopened.
+  state.onboardingComputerUse = true
+  await open()
+  for (let step = 1; step <= 3; step++) await next(step)
+  assert.equal(await cuaSwitch.getAttribute('aria-checked'), 'true')
 
   // Small windows remain scrollable; light theme and English share the same flow.
   await page.setViewportSize({ width: 680, height: 560 })
   await page.emulateMedia({ colorScheme: 'light' })
   await open('en')
-  for (let step = 1; step <= 3; step++) {
+  for (let step = 1; step <= 4; step++) {
     await next(step)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-    const button = page.getByRole('button', { name: step === 3 ? 'Finish and start' : 'Continue', exact: true })
+    const button = page.getByRole('button', { name: step === 4 ? 'Finish and start' : 'Continue', exact: true })
     await button.scrollIntoViewIfNeeded()
     assert.ok(await button.isVisible())
+    if (step === 3) {
+      await capture('computer-use-small-light')
+      await page.getByRole('button', { name: 'Permissions', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: 'System permissions', exact: true })
+      await dialog.getByRole('group', { name: 'Screen recording', exact: true }).getByText('Allowed', { exact: true }).waitFor()
+      const bounds = await dialog.boundingBox()
+      assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 680 && bounds.y + bounds.height <= 560)
+      await capture('computer-use-permissions-small-light')
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    }
   }
   await capture('recovery-small-light')
   // Returning to the first page also restores focus, without losing the current Profile.
-  for (let step = 2; step >= 0; step--) {
+  for (let step = 3; step >= 0; step--) {
     await page.getByRole('button', { name: 'Back', exact: true }).click()
     await page.locator(`[data-page="${step}"]`).waitFor()
     assert.equal(await page.locator('h1').evaluate(heading => document.activeElement === heading), true)
   }
   assert.deepEqual(errors, [])
-  console.log('Next onboarding passed: four pages, Back and Skip all, retained choices, exclusive market selection, completion and retry, reduced motion, keyboard focus, small-window scrolling and dark/light bilingual rendering. No Host or graphical app was started.')
+  console.log('Next onboarding passed: five pages, Back and Skip all, retained choices, exclusive market selection, Computer Use opt-in and official permission dialog, explicit permission actions, completion and retry, reduced motion, keyboard focus, small-window scrolling and dark/light bilingual rendering. No Host, graphical app or OS permission prompt was started.')
 } catch (error) {
   await capture('failure').catch(() => {})
   console.error(await page.locator('body').innerText())
