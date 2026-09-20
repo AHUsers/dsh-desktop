@@ -52,6 +52,7 @@ export interface DesktopSettingsSectionInjected {
     readonly markets?: readonly DesktopMarketProvider[]
     readonly materialRequiresRestart?: boolean
     readonly nativeLanConfirmation?: boolean
+    readonly jobNotifications?: boolean
   }
   readonly browserActions?: ReactNode
   readonly extraSections?: ReactNode
@@ -858,7 +859,7 @@ export function DesktopSettingsSection({
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnTurnFailure', checked) }}
           />
-          <DesktopSettingsToggleRow
+          {capabilities?.jobNotifications !== false && <><DesktopSettingsToggleRow
             label={t('jobCompletion')}
             checked={notificationValue.notifyOnJobCompletion}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
@@ -869,7 +870,7 @@ export function DesktopSettingsSection({
             checked={notificationValue.notifyOnJobFailure}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnJobFailure', checked) }}
-          />
+          /></>}
         </div>
       </section>
       {extraSections}

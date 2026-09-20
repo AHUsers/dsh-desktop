@@ -2,6 +2,7 @@ export const IPC = {
   boot: 'dsh-next:boot', failed: 'dsh-next:failed', directory: 'dsh-next:directory',
   state: 'dsh-next:state', command: 'dsh-next:command',
   browserLinks: 'dsh-next:browser-links',
+  permissionQuery: 'dsh-next:permission-query', permissionRequest: 'dsh-next:permission-request', permissionSettings: 'dsh-next:permission-settings',
   material: 'dsh-next:material',
   locale: 'dsh-next:locale',
   nativeThemeSet: 'dsh-next:native-theme-set', windowsAppearance: 'dsh-next:windows-appearance', windowsMenu: 'dsh-next:windows-menu',

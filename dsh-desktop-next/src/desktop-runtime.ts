@@ -6,7 +6,7 @@ import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DesktopPreferenceStore, parsePreferences } from './desktop-preferences.ts'
 import { DEFAULT_FEATURES, NextProfiles } from './profiles.ts'
-import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type NotificationOutcome } from './desktop-contract.ts'
+import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type DesktopNotification } from './desktop-contract.ts'
 import { DesktopDiagnostics } from './diagnostics.ts'
 import { NextRecovery } from './recovery.ts'
 import { maskSecrets } from './mask-secrets.ts'
@@ -14,6 +14,7 @@ import { privateDirectory } from './private-files.ts'
 import { authenticateWebHost } from './web-document.ts'
 import { DesktopLanHttpsRuntime } from './lan-https-runtime.ts'
 import type { DesktopLanHttpsCertificate } from './lan-https-certificate.ts'
+import type { DesktopPermission, DesktopPermissionAction, DesktopPermissionSnapshot } from './permissions.ts'
 
 interface RuntimeOptions {
   home: string
@@ -25,7 +26,8 @@ interface RuntimeOptions {
   onChange(): void
   onRestart(): void
   onTerminal(): void
-  onNotification(outcome: NotificationOutcome): void
+  onNotification(notification: DesktopNotification): void
+  onPermission?(action: DesktopPermissionAction, permission: DesktopPermission): Promise<DesktopPermissionSnapshot>
 }
 
 export class NextDesktopRuntime {
@@ -203,7 +205,7 @@ export class NextDesktopRuntime {
         DSH_NEXT_PREFERENCES: JSON.stringify(effective), DSH_NEXT_TRUSTED_HOSTS: JSON.stringify(addresses),
         ...(this.safeMode ? { DSH_TELEMETRY_DISABLED: '1' } : {}) },
       onFailure, undefined, 'runtime', undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
-      chunk => this.diagnostics.hostChunk(chunk), options.onTerminal)
+      chunk => this.diagnostics.hostChunk(chunk), options.onTerminal, options.onPermission)
     this.hostProcess = host
     return {
       start: async (): Promise<void> => {

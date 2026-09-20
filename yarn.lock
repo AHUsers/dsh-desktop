@@ -3587,6 +3587,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-computer-use@file:vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-computer-use-0.1.6-alpha.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-computer-use@file:vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-computer-use-0.1.6-alpha.2.tgz#vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-computer-use-0.1.6-alpha.2.tgz::hash=9b9e10&locator=deepseek-harness-desktop%40workspace%3A."
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+    "@deepseek-ai/dsh-brand": ^0.1.6-alpha.2
+  checksum: 10c0/c6c6790eb0f374a7ffd8c3488fd85cdf9963bff3b3bdcee1ba005b32992a3446c0612ad3e04f158d5c15f7b2074804fd3882252798f211a9c05b1b7f01cec0e1
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-cordis-client-runner@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cordis-client-runner-0.1.5-rc.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.5-rc.2
   resolution: "@deepseek-ai/dsh-cordis-client-runner@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cordis-client-runner-0.1.5-rc.2.tgz#vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cordis-client-runner-0.1.5-rc.2.tgz::hash=ed6f51&locator=deepseek-harness-desktop%40workspace%3A."
@@ -3801,6 +3811,40 @@ __metadata:
     "@deepseek-ai/dsh-session": ^0.1.6-alpha.2
     "@deepseek-ai/dsh-typert-protocol": ^0.1.6-alpha.2
   checksum: 10c0/73a410b475d36f00e3ba8eba91b9f14e966d325ced1bdedd5c08313068c266c3f42e885179fba7660aa2d2477a562e948d9807fb27c6c8481c3a87b572f0bd9f
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@file:vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@file:vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz#vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz::hash=7983d4&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    "@deepseek-ai/dsh-mcp-client": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.2"
+    "@trycua/cua-driver": "npm:0.28.0"
+    zod: "npm:^4.4.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+    "@deepseek-ai/dsh-computer-use": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-system-prompt": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-tools": ^0.1.6-alpha.2
+  checksum: 10c0/6279e9d14100785edbc384708ceafab9c113dbb20a3237dd219136cde3a780d81f629909eccb55703e6546353510bd23133d3a7b9cffb08b921f2e33fb74be60
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@patch:@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz#./patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@patch:@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-experimental-computer-use-cua-driver-native-0.1.6-alpha.2.tgz%3A%3Ahash=7983d4&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=4e3b3c&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    "@deepseek-ai/dsh-mcp-client": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.2"
+    "@trycua/cua-driver": "npm:0.28.0"
+    zod: "npm:^4.4.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+    "@deepseek-ai/dsh-computer-use": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-system-prompt": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-tools": ^0.1.6-alpha.2
+  checksum: 10c0/2aa7dc72a2e40fb66ee85ca36c0eeb8423cdaf03843faba1b78c531cbb3b6ccdd8d7d092927d264ca454aa0a5621ebe035d833eaac6adf3378cbb59fae3c81d8
   languageName: node
   linkType: hard
 
@@ -11282,6 +11326,77 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@trycua/cua-driver-darwin-arm64@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-darwin-arm64@npm:0.28.0"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver-darwin-x64@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-darwin-x64@npm:0.28.0"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver-linux-arm64-gnu@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-linux-arm64-gnu@npm:0.28.0"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver-linux-x64-gnu@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-linux-x64-gnu@npm:0.28.0"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver-win32-arm64-msvc@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-win32-arm64-msvc@npm:0.28.0"
+  conditions: os=win32 & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver-win32-x64-msvc@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver-win32-x64-msvc@npm:0.28.0"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@trycua/cua-driver@npm:0.28.0":
+  version: 0.28.0
+  resolution: "@trycua/cua-driver@npm:0.28.0"
+  dependencies:
+    "@trycua/cua-driver-darwin-arm64": "npm:0.28.0"
+    "@trycua/cua-driver-darwin-x64": "npm:0.28.0"
+    "@trycua/cua-driver-linux-arm64-gnu": "npm:0.28.0"
+    "@trycua/cua-driver-linux-x64-gnu": "npm:0.28.0"
+    "@trycua/cua-driver-win32-arm64-msvc": "npm:0.28.0"
+    "@trycua/cua-driver-win32-x64-msvc": "npm:0.28.0"
+    "@ubjs/core": "npm:0.31.0-3"
+    "@ubjs/node": "npm:0.31.0-3"
+  dependenciesMeta:
+    "@trycua/cua-driver-darwin-arm64":
+      optional: true
+    "@trycua/cua-driver-darwin-x64":
+      optional: true
+    "@trycua/cua-driver-linux-arm64-gnu":
+      optional: true
+    "@trycua/cua-driver-linux-x64-gnu":
+      optional: true
+    "@trycua/cua-driver-win32-arm64-msvc":
+      optional: true
+    "@trycua/cua-driver-win32-x64-msvc":
+      optional: true
+  checksum: 10c0/5fce635d3378cbd9b70f0f25dc8b47bcdc5f4bdc3ebb63dc86c55767fa9ae7d92078cf5bb4917f00771aab84dbe7ff2f5f731ef08a3e8075386e94df47944d93
+  languageName: node
+  linkType: hard
+
 "@ts-morph/common@npm:~0.27.0":
   version: 0.27.0
   resolution: "@ts-morph/common@npm:0.27.0"
@@ -11510,6 +11625,102 @@ __metadata:
   version: 4.0.2
   resolution: "@types/validate-npm-package-name@npm:4.0.2"
   checksum: 10c0/5a109fe12570b7125740fdac8678970e3caf7de0cbd6e15cf93dad67a427a3a83e0759b5d4b64fd75bce6cdf43b0569275456a35183059046cba6c25d096b916
+  languageName: node
+  linkType: hard
+
+"@ubjs/core@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/core@npm:0.31.0-3"
+  checksum: 10c0/3e658aec5a71b418e496928565ba9383f18d5cee47b8b12f1b5985dcfc6b3221340b1b5a7b5436816e6e097113056e74cc324c803bdb8959d73401cef25dca8c
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-darwin-arm64@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-darwin-arm64@npm:0.31.0-3"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-darwin-x64@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-darwin-x64@npm:0.31.0-3"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-linux-arm64-gnu@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-linux-arm64-gnu@npm:0.31.0-3"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-linux-arm64-musl@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-linux-arm64-musl@npm:0.31.0-3"
+  conditions: os=linux & cpu=arm64 & libc=musl
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-linux-x64-gnu@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-linux-x64-gnu@npm:0.31.0-3"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-linux-x64-musl@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-linux-x64-musl@npm:0.31.0-3"
+  conditions: os=linux & cpu=x64 & libc=musl
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-win32-arm64-msvc@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-win32-arm64-msvc@npm:0.31.0-3"
+  conditions: os=win32 & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@ubjs/node-win32-x64-msvc@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node-win32-x64-msvc@npm:0.31.0-3"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@ubjs/node@npm:0.31.0-3":
+  version: 0.31.0-3
+  resolution: "@ubjs/node@npm:0.31.0-3"
+  dependencies:
+    "@ubjs/node-darwin-arm64": "npm:0.31.0-3"
+    "@ubjs/node-darwin-x64": "npm:0.31.0-3"
+    "@ubjs/node-linux-arm64-gnu": "npm:0.31.0-3"
+    "@ubjs/node-linux-arm64-musl": "npm:0.31.0-3"
+    "@ubjs/node-linux-x64-gnu": "npm:0.31.0-3"
+    "@ubjs/node-linux-x64-musl": "npm:0.31.0-3"
+    "@ubjs/node-win32-arm64-msvc": "npm:0.31.0-3"
+    "@ubjs/node-win32-x64-msvc": "npm:0.31.0-3"
+  dependenciesMeta:
+    "@ubjs/node-darwin-arm64":
+      optional: true
+    "@ubjs/node-darwin-x64":
+      optional: true
+    "@ubjs/node-linux-arm64-gnu":
+      optional: true
+    "@ubjs/node-linux-arm64-musl":
+      optional: true
+    "@ubjs/node-linux-x64-gnu":
+      optional: true
+    "@ubjs/node-linux-x64-musl":
+      optional: true
+    "@ubjs/node-win32-arm64-msvc":
+      optional: true
+    "@ubjs/node-win32-x64-msvc":
+      optional: true
+  checksum: 10c0/3e1cb9d3109bda5fb0e920bca67db79484c05b46c32c3368e1115dbf4472d33935f34ec5e6aa1f02a0e756756ad9d0683423f27484147fc1f03378ddc5d518c8
   languageName: node
   linkType: hard
 
@@ -13346,6 +13557,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-directory-picker-native": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-input-trigger": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-layout": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-primitives": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-renderer": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-session": "npm:0.1.6-alpha.2"
@@ -13361,11 +13573,13 @@ __metadata:
     "@deepseek-ai/dsh-commands": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-compaction": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-compaction-image-offload": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-computer-use": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-cordis-client-runner": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-cordis-host-runner": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-credentials": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-deepseek-llm-api-extensions": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-experimental-agent-team": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-file-reference": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-fs": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-fs-local": "npm:0.1.6-alpha.2"

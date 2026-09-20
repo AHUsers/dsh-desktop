@@ -71,6 +71,47 @@ afterEach(async () => {
 })
 
 describe('desktop host process', () => {
+  it('returns Desktop permission snapshots over private child IPC', async () => {
+    const snapshot = { permission: 'screen' as const, status: 'denied' as const, canRequest: false, canOpenSettings: true }
+    const source = HTTP_HOST.replace('const server = createServer', 'let permissionResponse;\nconst server = createServer')
+      .replace("  if (request.url === '/fatal') {", `
+        if (request.url === '/permission') {
+          permissionResponse = response;
+          process.send({ type: 'permission', requestId: 7, action: 'query', permission: 'screen' }); return;
+        }
+        if (request.url === '/fatal') {`)
+      .replace("  if (message.type === 'browser-access') {", `
+        if (message.type === 'permission-result') { permissionResponse.end(JSON.stringify(message)); return; }
+        if (message.type === 'browser-access') {`)
+    const runtime = projectWithHost(source)
+    const permission = vi.fn(async () => snapshot)
+    const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env, undefined,
+      undefined, 'link', undefined, undefined, undefined, undefined, undefined, undefined, permission)
+    hosts.push(host)
+    const { url } = await host.start()
+    expect(await (await fetch(new URL('/permission', url))).json()).toEqual({ type: 'permission-result', requestId: 7, snapshot })
+    expect(permission).toHaveBeenCalledExactlyOnceWith('query', 'screen')
+  })
+
+  it('delivers bounded user-turn previews over child IPC', async () => {
+    const notification = { outcome: 'turn-completed', userMessage: 'Check my code', assistantMessage: 'Fixed the issue.' }
+    const runtime = projectWithHost(HTTP_HOST.replace("  if (request.url === '/fatal') {", `
+      if (request.url === '/notify') {
+        process.send({ type: 'notification', notification: ${JSON.stringify(notification)} })
+        response.end('sent'); return
+      }
+      if (request.url === '/fatal') {`))
+    const notify = vi.fn()
+    const failure = vi.fn()
+    const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env, failure,
+      undefined, 'link', undefined, undefined, undefined, notify)
+    hosts.push(host)
+    const { url } = await host.start()
+    await fetch(new URL('/notify', url))
+    await expect.poll(() => notify.mock.calls).toEqual([[notification]])
+    expect(failure).not.toHaveBeenCalled()
+  })
+
   it('correlates browser-policy acknowledgements and refuses stale or failed changes', async () => {
     const host = hostProcess(projectWithHost())
     await expect(host.setBrowserAccess(true)).rejects.toThrow('unavailable')

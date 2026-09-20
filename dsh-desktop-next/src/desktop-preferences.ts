@@ -22,7 +22,7 @@ export function parsePreferences(value: unknown): DesktopPreferences {
       throw new Error('Port must be an integer from 0 through 65535')
     }
   }
-  return result as DesktopPreferences
+  return { ...result, jobCompleted: false, jobFailed: false } as DesktopPreferences
 }
 
 export function portsChanged(previous: DesktopPreferences, next: DesktopPreferences): boolean {

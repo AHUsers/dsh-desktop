@@ -5,6 +5,7 @@ import { DesktopNativeActions } from '../../../dsh-plugin-desktop-beta/src/clien
 import { en, zh, type DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 import type { DesktopCommand, DesktopState } from '../desktop-contract.ts'
 import { NextSettingsAdapter } from './settings-adapter.ts'
+import { DesktopPermissionsSection } from './permissions.tsx'
 
 export function useDesktopState(adapter: NextSettingsAdapter): DesktopState | undefined {
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot)
@@ -36,9 +37,12 @@ export function NextDesktopSettings({ adapter, language }: { adapter: NextSettin
     initialMode="compatibility" micaSupported={state?.windowsMicaSupported ?? false}
     setMode={async () => { throw new Error('Window modes are not supported in Next') }}
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
-    capabilities={{ windowModes: false, featuresReadOnly: state?.safeMode ?? true, markets: ['disabled', 'community-market'], materialRequiresRestart: false, nativeLanConfirmation: true }}
+    capabilities={{ windowModes: false, featuresReadOnly: state?.safeMode ?? true, markets: ['disabled', 'community-market'], materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
     browserActions={state && <NextBrowserActions adapter={adapter} state={state} language={language} />}
-    extraSections={state && <NextDesktopOptions adapter={adapter} state={state} language={language} />}
+    extraSections={<>
+      {adapter.bridge.permissions && <DesktopPermissionsSection service={adapter.bridge.permissions} language={language} />}
+      {state && <NextDesktopOptions adapter={adapter} state={state} language={language} />}
+    </>}
   /></div>
 }
 

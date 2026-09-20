@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from '../src/desktop-contract.ts'
+import type { NextDesktopRuntime } from '../src/desktop-runtime.ts'
 
 const fixture = vi.hoisted(() => ({
   windows: [] as any[], trays: [] as any[], handlers: new Map<string, (...args: any[]) => any>(),
   close: vi.fn(async () => {}), start: vi.fn(async () => {}), preferences: { closeToTray: true },
+  onPermission: undefined as ConstructorParameters<typeof NextDesktopRuntime>[0]['onPermission'],
 }))
 vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   preferences = { ...DEFAULT_PREFERENCES }
@@ -17,7 +19,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   recoveryMode = false
   backend = { host: undefined }
   diagnostics = { append: vi.fn(), flush: vi.fn() }
-  constructor() { fixture.preferences = this.preferences }
+  constructor(options: ConstructorParameters<typeof NextDesktopRuntime>[0]) { fixture.preferences = this.preferences; fixture.onPermission = options.onPermission }
   initialize() {}
   start = fixture.start
   close = fixture.close
@@ -36,7 +38,8 @@ vi.mock('electron', async () => {
   class BrowserWindow extends EventEmitter {
     visible = false
     webContents = Object.assign(new EventEmitter(), { id: fixture.windows.length + 1,
-      mainFrame: { url: '' }, setWindowOpenHandler() {}, send() {}, isDestroyed: () => false })
+      mainFrame: { url: '' }, getURL: () => this.webContents.mainFrame.url, setWindowOpenHandler() {}, send() {}, isDestroyed: () => false,
+      isFocused: () => true, executeJavaScript: vi.fn(async () => true) })
     constructor(readonly options: any) { super(); fixture.windows.push(this) }
     isDestroyed() { return false }
     isMinimized() { return false }
@@ -69,7 +72,9 @@ vi.mock('electron', async () => {
     nativeImage: { createFromPath: () => ({ isEmpty: () => false, setTemplateImage() {} }) },
     Menu: { buildFromTemplate: (items: any) => items, setApplicationMenu() {} },
     protocol: { registerSchemesAsPrivileged() {}, handle() {} },
-    session: { defaultSession: { webRequest: { onBeforeSendHeaders() {} } } },
+    session: { defaultSession: { webRequest: { onBeforeSendHeaders() {} }, setPermissionCheckHandler() {}, setPermissionRequestHandler() {}, setDisplayMediaRequestHandler() {} } },
+    systemPreferences: { getMediaAccessStatus: () => 'not-determined', askForMediaAccess: vi.fn(async () => false), isTrustedAccessibilityClient: () => false },
+    desktopCapturer: { getSources: vi.fn(async () => []) },
     ipcMain: { handle: (name: string, action: (...args: any[]) => any) => fixture.handlers.set(name, action), on: (name: string, action: (...args: any[]) => any) => fixture.handlers.set(name, action) },
   }
 })
@@ -107,6 +112,13 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(() => state({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     expect(() => state({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     const browserLinks = fixture.handlers.get('dsh-next:browser-links')!
+    const permissionQuery = fixture.handlers.get('dsh-next:permission-query')!
+    expect(permissionQuery(sender, 'microphone').permission).toBe('microphone')
+    expect(() => permissionQuery(sender, 'camera')).toThrow('Unsupported')
+    expect(() => permissionQuery({ ...sender, senderFrame: {} }, 'screen')).toThrow('Rejected')
+    const permissionRequest = fixture.handlers.get('dsh-next:permission-request')!
+    window.webContents.executeJavaScript.mockResolvedValueOnce(false)
+    await expect(permissionRequest(sender, 'microphone')).rejects.toThrow('user gesture')
     expect(browserLinks(sender)).toEqual({ localUrl: null, lanUrls: [] })
     expect(() => browserLinks({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     expect(() => browserLinks({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
@@ -121,7 +133,16 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(tray.menu[0].label).toBe('打开 DSH Desktop Next')
     fixture.handlers.get('dsh-next:locale')!(sender, 'en')
     expect(tray.menu[0].label).toBe('Open DSH Desktop Next')
-    const { app, dialog } = await import('electron')
+    const { app, dialog, systemPreferences, desktopCapturer } = await import('electron')
+    const previousUrl = controls.webContents.mainFrame.url
+    expect((await fixture.onPermission!('query', 'screen')).status).not.toBe('granted')
+    expect(controls.webContents.mainFrame.url).toBe(previousUrl)
+    await fixture.onPermission!('request', 'screen')
+    expect(controls.webContents.mainFrame.url).toMatch(/#permissions$/)
+    await fixture.onPermission!('open-settings', 'microphone')
+    expect(fixture.windows).toHaveLength(2)
+    expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled()
+    expect(desktopCapturer.getSources).not.toHaveBeenCalled()
     vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false })
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'restart-recovery' })
     expect(fixture.close).not.toHaveBeenCalled()

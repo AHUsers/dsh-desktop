@@ -41,7 +41,7 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 在官方主界面中打开 **设置 → 桌面**，或使用托盘的 **桌面设置…**、`CmdOrCtrl+,`。Host 启动失败时，托盘和独立控制窗口仍然可用。切换 Profile、应用功能开关或更改端口，会先停止当前 Host，再启动新 Host，进行中的任务会被中断。浏览器和局域网访问开关即时生效，无需重启。
 
 - **托盘与后台运行：** 沿用原桌面版的常用项顺序：打开主窗口、重新加载界面、打开 DSH 终端、导出诊断、进入／退出安全模式、Profile 选择与新建。另保留桌面设置和恢复助手入口；原生菜单跟随应用内语言。开启后台运行且托盘可用时，关闭主窗口不会停止 Host 和远控连接；明确选择退出才会关闭 HTTPS 入口与 Host。系统托盘不可用时，关闭主窗口会退出应用，避免留下无法重新打开的进程。
-- **桌面设置：** 后台运行、macOS 透明材质、受支持的 Windows Mica、本机和局域网访问及端口、日志级别，以及用户回合和后台任务完成／失败时的独立通知开关。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存，端口单独保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Acrylic 继续停用；Mica 要求 Windows 内部版本不低于 22621。通知还需系统授权，仅在主窗口未聚焦时显示通用状态，不包含会话正文。
+- **桌面设置：** 后台运行、macOS 透明材质、受支持的 Windows Mica、本机和局域网访问、日志级别，以及用户回合完成／失败时的独立通知开关。后台任务不发送通知。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Acrylic 继续停用；Mica 要求 Windows 内部版本不低于 22621。通知还需系统授权，仅在主窗口未聚焦时显示。成功通知以本轮用户消息为标题、AI 最后一条可见回复为正文，过长内容会截断；失败通知显示通用状态，子代理和自动回合不发送通知。
 - **Profile：** 新建、切换、打开目录或移除未使用的 Profile。托盘的新建入口直接聚焦名称，创建后可切换；损坏的清单或缺少 Next bundle 的 Profile 标为不可用，切换当前 Profile 不会重复重启。移除操作将文件移入恢复备份目录，当前 Profile 和默认 Profile 不可移除。Profile 分别保存插件依赖、激活列表、补丁和功能开关；会话、设置和凭据仍按上游规则在同一个 Next home 内共享，不提供账号或数据隔离。
 - **社区市场：** 默认启用，沿用发现、来源管理、安装预览、确认安装和卸载流程。包操作使用随应用提供的 pnpm，完成后可请求重启；macOS 和 Windows 也支持市场中的终端入口。
 - **手机远控：** 默认关闭。启用并重启后，在官方主界面的“手机连接”中完成配置；Connector 状态按 Profile 保存在 Next home。切换 Profile 会停止旧 Host 和其中的远控连接。
@@ -54,6 +54,44 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 浏览器访问默认关闭。启用本机访问后可获得经过认证的本机登录链接；启用局域网访问后，另设 HTTPS/WSS 入口，Host 仍只绑定 `127.0.0.1`。端口默认为 `0`，由系统自动分配。访问开关无需重启 Host。关闭浏览器访问也会断开已有的浏览器 WebSocket，而原生窗口连接和正在运行的任务继续保留。更改端口需要重启 Host；局域网地址在启动时读取，切换网络后需要重启。
 
 设置页显示完整的本机登录地址，并为每个局域网地址单独显示一条 HTTPS 登录地址，包含浏览器登录 `token`。每行可以打开或复制该行的完整地址。登录链接通过校验发送方的原生 IPC 单独读取，不进入通用运行状态或诊断导出。设置页还可导出本机的公共 CA 证书。在其他设备上信任该证书前，请核对 SHA-256 指纹。登录链接可授予访问权限，只应与可信设备共享。CA 私钥由系统安全存储加密；安全存储或可用局域网地址缺失时，HTTPS 入口保持关闭，界面显示原因。原生窗口的访问凭据不会进入登录链接，局域网入口也会移除这类凭据。
+
+### 原生权限与 Computer Use
+
+沿用现有桌面设置页面，显示麦克风、屏幕录制和 macOS 辅助功能的权限状态。应用启动和打开设置时只查询权限；用户点击按钮后才请求系统授权或打开对应的系统隐私设置。macOS 系统设置中的权限变更可能需要重启应用。Windows 麦克风限制提供隐私设置入口；平台不支持的状态查询返回 `unknown`，不假定已经授权。
+
+Next 向原生客户端插件和 Host 插件提供 Cordis 服务 `desktopPermissions`。从 `dsh-desktop-next/permissions` 导入类型，并注入 `desktopPermissions`；普通浏览器客户端没有此服务。方法为 `query(permission)`、`request(permission)` 和 `openSettings(permission)`，权限名称包括 `microphone`、`screen`、`accessibility`。结果包含 `status`、`canRequest` 和 `canOpenSettings`。
+
+```ts
+import type { Context } from '@deepseek-ai/cordis'
+import type {} from 'dsh-desktop-next/permissions'
+
+export const inject = ['desktopPermissions']
+
+// 从原生客户端插件的“录音”按钮中直接调用。
+export async function record(ctx: Context) {
+  const state = await ctx.desktopPermissions.request('microphone')
+  if (state.status === 'denied' || state.status === 'restricted') return
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  // 将流交给录音器；结束录音时停止所有 track。
+  return stream
+}
+```
+
+客户端请求必须由当前前台窗口中的用户操作触发。Host 请求不能模拟用户点击：它会打开现有的桌面权限设置，并返回当前系统状态，插件应在用户授权后重新查询。Host IPC 关联请求与响应，设置超时，并在卸载时拒绝尚未完成的请求。每次查询都会重新读取系统状态。
+
+屏幕共享应在用户点击“共享”时直接调用 `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`。macOS 15 及以上使用 Electron 的系统选择器，其余系统使用原生菜单选择来源，不自动选择屏幕。系统选择器的单次共享授权可能不同于全局屏幕录制权限。权限服务本身不录制媒体，屏幕共享也不授予电脑输入控制能力。开发使用的 Electron 应用已经在 Info.plist 中声明麦克风用途；将来打包 Next 时必须保留 `NSMicrophoneUsageDescription`，并填写产品用途说明。
+
+内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2`，**默认停用**。在**插件 → Computer Use** 中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。权限按钮打开现有桌面设置。
+
+版本限定的 Yarn 补丁位于 `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch`。存在 `desktopPermissions` 时，`check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开桌面设置，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
+
+单元测试对安装后的补丁插件使用模拟原生 SDK。可选的原生验证要求 SDK 支持当前平台，会加载并关闭真实插件，不发送输入、不截图：
+
+```sh
+corepack yarn workspace dsh-desktop-next verify:host --computer-use
+```
+
+可选的 `verify:window-controls --computer-use` 检查还会在无窗口 Chromium 中通过官方前端启用和停用真实驱动，不调用电脑操作工具。原生系统授权和实际电脑操作仍需手动验收。
 
 ### 恢复
 

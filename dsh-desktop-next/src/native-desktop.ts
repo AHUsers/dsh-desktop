@@ -1,9 +1,9 @@
-/** Electron-only tray, materials, and privacy-safe notifications. */
+/** Electron-only tray, materials, and user-turn notifications. */
 import { join } from 'node:path'
 import { Menu, nativeImage, nativeTheme, Notification, Tray, type BrowserWindow } from 'electron'
 import { desktopMenu } from './desktop-menu.ts'
-import { notificationEnabled } from './notifications.ts'
-import type { DesktopCommand, DesktopPreferences, DesktopState, NotificationOutcome } from './desktop-contract.ts'
+import { notificationCopy, notificationEnabled } from './notifications.ts'
+import type { DesktopCommand, DesktopPreferences, DesktopState, DesktopNotification } from './desktop-contract.ts'
 import { windowMaterial } from './window-material.ts'
 import { IPC } from './ipc.ts'
 
@@ -44,18 +44,11 @@ export class NativeDesktop {
     this.tray!.setToolTip(`DSH Desktop Next · ${state.selected} · ${state.phase}`)
     this.tray!.setContextMenu(Menu.buildFromTemplate(this.items()))
   }
-  notify(outcome: NotificationOutcome): void {
+  notify(message: DesktopNotification): void {
     const state = this.options.state()
     const window = this.options.window()
-    if (!Notification.isSupported() || !notificationEnabled(state.preferences, outcome) || window?.isFocused()) return
-    const zh = this.options.language().startsWith('zh')
-    const copy = {
-      'turn-completed': [zh ? '回合已完成' : 'Turn completed', zh ? '你发起的回合已完成。' : 'A turn you started has finished.'],
-      'turn-failed': [zh ? '回合未能完成' : 'Turn could not finish', zh ? '打开 DSH Desktop Next 查看详情。' : 'Open DSH Desktop Next for details.'],
-      'job-completed': [zh ? '后台任务已完成' : 'Background job completed', zh ? '一个后台任务已结束。' : 'A background job has finished.'],
-      'job-failed': [zh ? '后台任务失败' : 'Background job failed', zh ? '打开 DSH Desktop Next 查看详情。' : 'Open DSH Desktop Next for details.'],
-    }[outcome]
-    const notification = new Notification({ title: copy[0], body: copy[1] })
+    if (!Notification.isSupported() || !notificationEnabled(state.preferences, message.outcome) || window?.isFocused()) return
+    const notification = new Notification(notificationCopy(message, this.options.language()))
     this.notifications.add(notification)
     notification.once('click', this.options.show)
     notification.once('close', () => this.notifications.delete(notification))
