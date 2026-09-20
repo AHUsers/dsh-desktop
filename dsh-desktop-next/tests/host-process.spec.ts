@@ -71,6 +71,25 @@ afterEach(async () => {
 })
 
 describe('desktop host process', () => {
+  it('delivers bounded user-turn previews over child IPC', async () => {
+    const notification = { outcome: 'turn-completed', userMessage: 'Check my code', assistantMessage: 'Fixed the issue.' }
+    const runtime = projectWithHost(HTTP_HOST.replace("  if (request.url === '/fatal') {", `
+      if (request.url === '/notify') {
+        process.send({ type: 'notification', notification: ${JSON.stringify(notification)} })
+        response.end('sent'); return
+      }
+      if (request.url === '/fatal') {`))
+    const notify = vi.fn()
+    const failure = vi.fn()
+    const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env, failure,
+      undefined, 'link', undefined, undefined, undefined, notify)
+    hosts.push(host)
+    const { url } = await host.start()
+    await fetch(new URL('/notify', url))
+    await expect.poll(() => notify.mock.calls).toEqual([[notification]])
+    expect(failure).not.toHaveBeenCalled()
+  })
+
   it('correlates browser-policy acknowledgements and refuses stale or failed changes', async () => {
     const host = hostProcess(projectWithHost())
     await expect(host.setBrowserAccess(true)).rejects.toThrow('unavailable')

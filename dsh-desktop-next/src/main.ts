@@ -55,7 +55,7 @@ const runtime = new NextDesktopRuntime({
   onChange: () => { if (app.isReady()) native.refresh() },
   onRestart: () => run({ type: 'restart' }),
   onTerminal: () => run({ type: 'terminal' }),
-  onNotification: outcome => native.notify(outcome),
+  onNotification: notification => native.notify(notification),
 })
 const native = new NativeDesktop({ root, language: () => windowsLanguage, state, window: () => mainWindow,
   show: openMain, run, warn: error => runtime.diagnostics.append(String(error), 'warn') })

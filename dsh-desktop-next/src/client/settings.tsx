@@ -36,7 +36,7 @@ export function NextDesktopSettings({ adapter, language }: { adapter: NextSettin
     initialMode="compatibility" micaSupported={state?.windowsMicaSupported ?? false}
     setMode={async () => { throw new Error('Window modes are not supported in Next') }}
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
-    capabilities={{ windowModes: false, featuresReadOnly: state?.safeMode ?? true, markets: ['disabled', 'community-market'], materialRequiresRestart: false, nativeLanConfirmation: true }}
+    capabilities={{ windowModes: false, featuresReadOnly: state?.safeMode ?? true, markets: ['disabled', 'community-market'], materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
     browserActions={state && <NextBrowserActions adapter={adapter} state={state} language={language} />}
     extraSections={state && <NextDesktopOptions adapter={adapter} state={state} language={language} />}
   /></div>

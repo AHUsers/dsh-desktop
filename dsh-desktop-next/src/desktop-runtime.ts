@@ -6,7 +6,7 @@ import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DesktopPreferenceStore, parsePreferences } from './desktop-preferences.ts'
 import { DEFAULT_FEATURES, NextProfiles } from './profiles.ts'
-import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type NotificationOutcome } from './desktop-contract.ts'
+import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type DesktopNotification } from './desktop-contract.ts'
 import { DesktopDiagnostics } from './diagnostics.ts'
 import { NextRecovery } from './recovery.ts'
 import { maskSecrets } from './mask-secrets.ts'
@@ -25,7 +25,7 @@ interface RuntimeOptions {
   onChange(): void
   onRestart(): void
   onTerminal(): void
-  onNotification(outcome: NotificationOutcome): void
+  onNotification(notification: DesktopNotification): void
 }
 
 export class NextDesktopRuntime {

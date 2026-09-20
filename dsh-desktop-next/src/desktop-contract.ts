@@ -3,8 +3,10 @@ import type { Features } from './profiles.ts'
 import type { DesktopLanHttpsRuntimeSnapshot } from './lan-https-runtime.ts'
 
 export const NATIVE_ACCESS_HEADER = 'x-dsh-desktop-renderer'
-export const NOTIFICATION_OUTCOMES = ['turn-completed', 'turn-failed', 'job-completed', 'job-failed'] as const
-export type NotificationOutcome = typeof NOTIFICATION_OUTCOMES[number]
+export type DesktopNotification =
+  | { outcome: 'turn-completed'; userMessage: string; assistantMessage: string }
+  | { outcome: 'turn-failed' }
+export type NotificationOutcome = DesktopNotification['outcome']
 
 export interface DesktopPreferences {
   closeToTray: boolean
@@ -18,6 +20,7 @@ export interface DesktopPreferences {
   notifications: boolean
   turnCompleted: boolean
   turnFailed: boolean
+  /** Retained for old preference files and the shared settings adapter; always disabled in Next. */
   jobCompleted: boolean
   jobFailed: boolean
 }
@@ -25,7 +28,7 @@ export interface DesktopPreferences {
 export const DEFAULT_PREFERENCES: Readonly<DesktopPreferences> = Object.freeze({
   closeToTray: true, macosMaterial: 'transparent', windowsMaterial: 'off',
   browserAccess: false, networkExposure: 'loopback', port: 0, lanPort: 0, logLevel: 'info',
-  notifications: true, turnCompleted: true, turnFailed: true, jobCompleted: true, jobFailed: true,
+  notifications: true, turnCompleted: true, turnFailed: true, jobCompleted: false, jobFailed: false,
 })
 
 export interface DesktopState {

@@ -3,7 +3,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 import { desktopNodeEnvironment } from './node-environment.ts'
-import { NOTIFICATION_OUTCOMES, type NotificationOutcome } from './desktop-contract.ts'
+import type { DesktopNotification } from './desktop-contract.ts'
+import { isDesktopNotification } from './notifications.ts'
 
 interface ReadyEvent {
   readonly type: 'ready'
@@ -16,7 +17,7 @@ interface FatalEvent {
   readonly message: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; outcome: NotificationOutcome } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
+type DesktopHostEvent = ReadyEvent | FatalEvent | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; notification: DesktopNotification } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -36,7 +37,7 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
     case 'fatal':
       return typeof candidate.message === 'string'
     case 'notification':
-      return NOTIFICATION_OUTCOMES.includes(candidate.outcome as NotificationOutcome)
+      return isDesktopNotification(candidate.notification)
     case 'desktop-action':
       return candidate.action === 'restart' || candidate.action === 'terminal'
     case 'update-tasks':
@@ -113,7 +114,7 @@ export class DesktopHostProcess {
     private readonly packageManager?: { readonly pnpm: string; readonly nodeBin: string },
     private readonly hostEntry?: string,
     private readonly onRestart?: () => void,
-    private readonly onNotification?: (outcome: NotificationOutcome) => void,
+    private readonly onNotification?: (notification: DesktopNotification) => void,
     private readonly onLog?: (chunk: string) => void,
     private readonly onTerminal?: () => void,
   ) {}
@@ -158,7 +159,7 @@ export class DesktopHostProcess {
       }
       else if (message.type === 'fatal') this.fail(new Error(message.message))
       else if (message.type === 'notification') {
-        if (!this.stopping && !this.failureReported) this.onNotification?.(message.outcome)
+        if (!this.stopping && !this.failureReported) this.onNotification?.(message.notification)
       }
       else if (message.type === 'desktop-action') {
         if (!this.stopping && !this.failureReported) {

@@ -223,6 +223,7 @@ try {
   assert.equal(await settings.getByRole('heading', { name: /^(端口设置|Port settings)$/ }).count(), 0)
   assert.equal(await settings.getByRole('spinbutton').count(), 0)
   const notifications = settings.getByRole('switch', { name: /启用桌面通知|Enable Desktop notifications/ })
+  assert.equal(await settings.getByRole('switch', { name: /后台任务|Background job/ }).count(), 0)
   await notifications.click()
   await page.waitForFunction(() => document.querySelector('[aria-labelledby="dsh-desktop-notifications-title"] [role="switch"]')?.getAttribute('aria-checked') === 'false')
   assert.equal(await settings.getByRole('switch', { name: /本轮任务完成|Current turn completed/ }).isDisabled(), true)

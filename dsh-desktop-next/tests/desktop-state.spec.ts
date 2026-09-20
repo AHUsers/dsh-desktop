@@ -17,6 +17,7 @@ it('keeps desktop preferences separate from the Host and validates all IPC-contr
   const { home } = environment()
   const store = new DesktopPreferenceStore(home)
   expect(store.read()).toEqual(DEFAULT_PREFERENCES)
+  expect(parsePreferences({ jobCompleted: true, jobFailed: true })).toMatchObject({ jobCompleted: false, jobFailed: false })
   store.write({ ...DEFAULT_PREFERENCES, browserAccess: true, port: 3123, closeToTray: false })
   expect(new DesktopPreferenceStore(home).read()).toMatchObject({ browserAccess: true, port: 3123, closeToTray: false })
   for (const value of [{ port: -1 }, { port: '3000' }, { port: 1.1 }, { lanPort: 65536 }, { browserAccess: 'true' }, { windowsMaterial: 'invalid' }, { filename: '/tmp/escape' }]) expect(() => parsePreferences(value)).toThrow()

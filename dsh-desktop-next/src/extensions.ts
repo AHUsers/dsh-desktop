@@ -11,8 +11,8 @@ export const name = 'desktop-next-capabilities'
 export const inject = ['profileContext']
 
 export function apply(ctx: Context): void {
-  if (process.send) installNotifications(ctx, outcome => {
-    if (process.connected) process.send?.({ type: 'notification', outcome }, () => {})
+  if (process.send) installNotifications(ctx, notification => {
+    if (process.connected) process.send?.({ type: 'notification', notification }, () => {})
   })
   const profile = ctx.profileContext
   const invocation = profile.packageManager
