@@ -7,30 +7,30 @@ export function DesktopPermissionsSection({ service, language }: { service: Desk
   const zh = language.startsWith('zh')
   return <section className="dshDesktopSettingsGroup" aria-label={zh ? '系统权限' : 'System permissions'}>
     <h3>{zh ? '系统权限' : 'System permissions'}</h3>
-    <DesktopPermissionsButton service={service} language={language} initialOpen={location.hash === '#permissions'} />
+    <DesktopPermissionsButton service={service} language={language} />
   </section>
 }
 
-export function DesktopPermissionsButton({ service, language, initialOpen = false, iconOnly = false }: { service?: DesktopPermissions; language: string; initialOpen?: boolean; iconOnly?: boolean }) {
-  const [open, setOpen] = useState(initialOpen)
-  useEffect(() => { if (initialOpen) setOpen(true) }, [initialOpen])
+export function DesktopPermissionsButton({ service, language, iconOnly = false }: { service?: DesktopPermissions; language: string; iconOnly?: boolean }) {
+  const [open, setOpen] = useState(false)
   const zh = language.startsWith('zh')
   const label = zh ? '授权设置' : 'Permissions'
-  const close = (): void => {
-    setOpen(false)
-    if (initialOpen && location.hash === '#permissions') location.hash = 'general'
-  }
   return <>
     <Button variant={iconOnly ? 'ghost' : 'outline'} size="sm" aria-label={label} title={label}
-      className={iconOnly ? 'dshNextPermissionGear' : undefined} icon={iconOnly ? <IconSettingsOutline16 /> : undefined}
+      className={iconOnly ? 'dshNextSettingsGear' : undefined} icon={iconOnly ? <IconSettingsOutline16 /> : undefined}
       onClick={() => { setOpen(true) }}>{iconOnly ? null : label}</Button>
-    <Modal open={open} onClose={close} title={zh ? '系统权限' : 'System permissions'}
+    <DesktopPermissionsDialog open={open} onClose={() => { setOpen(false) }} service={service} language={language} />
+  </>
+}
+
+export function DesktopPermissionsDialog({ open, onClose, service, language }: { open: boolean; onClose(): void; service?: DesktopPermissions; language: string }) {
+  const zh = language.startsWith('zh')
+  return <Modal open={open} onClose={onClose} title={zh ? '系统权限' : 'System permissions'}
       closeLabel={zh ? '关闭' : 'Close'} className="dshNextPermissionsDialog"
       description={zh ? '按需授权。更改系统权限后，可能需要重启应用。' : 'Grant access when needed. You may need to restart the app after changing system permissions.'}>
       {open && (service ? <PermissionDetails service={service} language={language} />
         : <p role="status">{zh ? '请在运行 DSH 的桌面应用中管理系统权限。' : 'Manage system permissions in the desktop app running DSH.'}</p>)}
     </Modal>
-  </>
 }
 
 function PermissionDetails({ service, language }: { service: DesktopPermissions; language: string }) {

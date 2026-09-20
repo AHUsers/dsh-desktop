@@ -12,7 +12,7 @@ import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { resolveDesktopLocale } from './menu-locale.ts'
 import { NextDesktopRuntime } from './desktop-runtime.ts'
-import { NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState } from './desktop-contract.ts'
+import { NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState, type DesktopSettingsPage } from './desktop-contract.ts'
 import { portsChanged, parsePreferences } from './desktop-preferences.ts'
 import { NativeDesktop, applyWindowMaterial } from './native-desktop.ts'
 import { desktopLanAddresses } from './lan-addresses.ts'
@@ -37,6 +37,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'dsh-app', privileges: {
 
 let mainWindow: BrowserWindow | undefined
 let shellWindow: BrowserWindow | undefined
+let pendingSettings: DesktopSettingsPage | undefined
 let quitting = false
 let relaunch: string[] | undefined
 let ownsInstance = false
@@ -60,10 +61,9 @@ const runtime = new NextDesktopRuntime({
   onPermission: async (action, permission) => {
     if (quitting) throw new Error('Desktop is shutting down')
     const snapshot = permissions.query(permission)
-    // Host calls can reveal the native controls. Only an actual user click there may prompt the OS.
+    // Host calls reveal the permission dialog; only a user click there may prompt the OS.
     if (action === 'open-settings' || action === 'request' && snapshot.status !== 'granted' && (snapshot.canRequest || snapshot.canOpenSettings)) {
-      if (shellWindow && !shellWindow.isDestroyed() && shellWindow.webContents.getURL().endsWith('#permissions')) show(shellWindow)
-      else openControls('permissions')
+      openSettings('permissions')
     }
     return snapshot
   },
@@ -129,8 +129,17 @@ function createWindow(preload: string, primary = false): BrowserWindow {
   return window
 }
 
+function openSettings(page: DesktopSettingsPage = 'general'): void {
+  if (quitting) return
+  if (runtime.recoveryMode || runtime.state().phase === 'error') { openControls('recovery'); return }
+  pendingSettings = page
+  openMain()
+  mainWindow?.webContents.send(IPC.settingsOpen)
+}
+
 function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' = 'general'): void {
   if (quitting) return
+  if (page === 'general' || page === 'tools' || page === 'permissions') { openSettings(page === 'permissions' ? 'permissions' : 'general'); return }
   const url = `${SHELL_URL}?locale=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}&platform=${process.platform}&frame=${auxiliaryWindowHasCustomFrame()}#${page}`
   const resize = (window: BrowserWindow): void => {
     const creating = page === 'create-profile'
@@ -309,6 +318,12 @@ async function main(): Promise<void> {
     runtime.report(new Error(message.slice(0, 4096)))
   })
   ipcMain.handle(IPC.state, event => { assertDesktopSender(event); return state() })
+  ipcMain.handle(IPC.settingsTake, event => {
+    assertSender(event, mainWindow, APP_URL)
+    const page = pendingSettings
+    pendingSettings = undefined
+    return page
+  })
   ipcMain.handle(IPC.browserLinks, event => { assertDesktopSender(event); return runtime.browserLinks() })
   ipcMain.handle(IPC.permissionQuery, (event, permission: unknown) => { assertDesktopSender(event); return permissions.query(permission) })
   const permissionGesture = async (event: IpcMainInvokeEvent): Promise<void> => {

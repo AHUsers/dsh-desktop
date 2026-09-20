@@ -54,9 +54,9 @@ export function ComputerUseSettings({ context, zh }: { context: Context; zh: boo
     <div className="dshNextPluginHeading">
       <h3 id="next-computer-use-title">Computer Use</h3>
       <div className="dshNextPluginActions">
+        <DesktopPermissionsButton service={window.desktopNext?.permissions} language={zh ? 'zh' : 'en'} iconOnly />
         <Switch label={t('启用 Computer Use', 'Enable Computer Use')} checked={row?.enabled ?? false}
           disabled={loading || busy || !row || row.readOnlyReason !== undefined} onChange={enabled => { void change(enabled) }} />
-        <DesktopPermissionsButton service={window.desktopNext?.permissions} language={zh ? 'zh' : 'en'} iconOnly />
       </div>
     </div>
     <p className="dshDesktopSettingsHint">{t('让 AI 查看屏幕、操作鼠标和键盘。截图理解需要支持图片输入的模型。', 'Let AI view the screen and control the mouse and keyboard. Understanding screenshots requires a model with image input.')}</p>

@@ -1,6 +1,7 @@
-/** Shared by the official Plugins page and the existing native Settings window. */
+/** Shared by the official Plugins page and the in-app permission dialog. */
 const STYLES = `
-.dshNextPluginControls { display: grid; gap: 22px; margin: 0 0 28px; color: var(--dsw-alias-label-primary); }
+/* The slot anchor uses display:contents, so the page's direct-child width does not reach this flex item. */
+.dshNextPluginControls { box-sizing: border-box; width: 100%; max-width: 960px; min-width: 0; display: grid; gap: 22px; margin: 0 0 28px; color: var(--dsw-alias-label-primary); }
 .dshNextPluginControls > .dshDesktopSettingsGroup { padding-top: 0; border-top: 0; }
 .dshNextMarketChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .dshNextPluginSections { display: grid; gap: 22px; }
@@ -8,7 +9,7 @@ const STYLES = `
 .dshNextComputerUse { display: grid; gap: 8px; }
 .dshNextPluginActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dshNextPluginHeading > .dshNextPluginActions { flex-wrap: nowrap; flex-shrink: 0; }
-button.dshNextPermissionGear { width: 28px; padding: 0; }
+button.dshNextSettingsGear { width: 28px; padding: 0; }
 .dshNextPluginControls p { margin: 0; }
 .dshNextPermissionsDialog { width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
 .dshNextPermissionList { display: grid; gap: 0; }

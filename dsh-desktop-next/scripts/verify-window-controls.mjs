@@ -83,6 +83,10 @@ try {
   })
   await context.addInitScript(() => {
     window.desktopNext = { state: () => window.__nextTestState(), browserLinks: () => window.__nextTestBrowserLinks(), command: command => window.__nextTestCommand(command) }
+    window.desktopNext.onOpenSettings = listener => {
+      window.__nextTestOpenSettings = listener
+      return () => { delete window.__nextTestOpenSettings }
+    }
     window.desktopNext.permissions = {
       query: permission => window.__nextTestPermission('query', permission),
       request: permission => window.__nextTestPermission('request', permission),
@@ -175,6 +179,13 @@ try {
   await reopen.waitFor({ state: 'visible' })
   mkdirSync(screenshots, { recursive: true })
   await page.screenshot({ path: join(screenshots, 'new-session-collapsed.png'), animations: 'disabled' })
+  // A tray/shortcut request activates the official Settings trigger even with the sidebar collapsed.
+  await page.evaluate(() => window.__nextTestOpenSettings('general'))
+  await page.getByRole('dialog', { name: /^(设置|Settings)$/ }).waitFor()
+  assert.equal(await context.pages().length, 1, 'Settings must stay inside the existing app window')
+  await page.evaluate(() => window.__nextTestOpenSettings('general'))
+  assert.equal(await page.getByRole('dialog', { name: /^(设置|Settings)$/ }).count(), 1)
+  await page.getByRole('button', { name: /^(关闭|Close)$/ }).click()
   await expand()
 
   // The independent Plugins panel needs the same escape and a drag strip above its actions.
@@ -188,19 +199,30 @@ try {
   assert.equal(await page.locator('[data-plugin-item="desktop-next-computer-use"]').count(), 0)
   const markets = controls.getByRole('radiogroup', { name: /插件市场|Plugin market/ })
   assert.equal(await markets.getByRole('radio').count(), 2)
-  const communityChoice = markets.getByRole('radio', { name: /社区插件市场|Community Market/ })
-  const dshChoice = markets.getByRole('radio', { name: /DSH Market/ })
+  const communityChoice = markets.getByRole('radio', { name: /dsh-community-market/ })
+  const dshChoice = markets.getByRole('radio', { name: /dsh-market/ })
+  await communityChoice.getByText('DSH Desktop 内置的开放插件市场，支持添加和选择自定义插件数据源。').waitFor()
+  assert.equal(await dshChoice.getByRole('link', { name: 'awesome-dsh-plugin', exact: true }).count(), 1)
   const waitSelected = async choice => {
     await page.waitForFunction(selector => document.querySelector(selector)?.getAttribute('aria-checked') === 'true', choice)
   }
-  await communityChoice.click()
+  await communityChoice.click({ position: { x: 10, y: 10 } })
   await waitSelected('[data-next-markets] [role="radio"]:first-child')
   const marketFooter = footer.getByRole('button', { name: /插件市场|Plugin market/ })
   await marketFooter.waitFor()
   const remote = controls.getByRole('switch', { name: /启用远程控制|Enable remote control/ })
+  const remoteGear = controls.getByRole('button', { name: /^(远程控制设置|Remote control settings)$/ })
   assert.equal(await remote.isChecked(), false)
+  assert.equal(await remoteGear.isDisabled(), true)
   await remote.click()
   await waitSelected('[data-next-remote-control] [role="switch"]')
+  await footer.getByRole('button', { name: '手机连接', exact: true }).waitFor()
+  await remoteGear.click()
+  const remoteDialog = page.getByRole('dialog', { name: /^(手机连接|Agents Anywhere)$/ })
+  await remoteDialog.waitFor()
+  assert.equal(await remoteDialog.getByRole('tablist', { name: '连接管理' }).count(), 1)
+  assert.equal(await context.pages().length, 1)
+  await remoteDialog.getByRole('button', { name: '关闭手机连接', exact: true }).click()
   await dshChoice.focus()
   await dshChoice.press('Space')
   await waitSelected('[data-next-markets] [role="radio"]:last-child')
@@ -210,7 +232,7 @@ try {
   await page.getByRole('button', { name: /^(设置|Settings)$/ }).click()
   await page.getByRole('dialog').getByRole('button', { name: /^(插件市场|Plugin Market)$/ }).waitFor()
   await page.getByRole('button', { name: /^(关闭|Close)$/ }).click()
-  await communityChoice.click()
+  await communityChoice.click({ position: { x: 10, y: 10 } })
   await waitSelected('[data-next-markets] [role="radio"]:first-child')
   assert.equal(await dshChoice.getAttribute('aria-checked'), 'false')
   assert.equal(await remote.isChecked(), true)
@@ -223,7 +245,7 @@ try {
         error: { code: 'operation-error', diagnostic: 'Fixture: market change rejected' } } },
     }) })
   }, { times: 1 })
-  await dshChoice.click()
+  await dshChoice.click({ position: { x: 10, y: 10 } })
   await controls.getByRole('alert').getByText('Fixture: market change rejected', { exact: false }).waitFor()
   assert.equal(await communityChoice.getAttribute('aria-checked'), 'true')
   await controls.getByRole('button', { name: /^(重试|Retry)$/ }).click()
@@ -235,7 +257,10 @@ try {
   assert.equal(await cuaSwitch.isDisabled(), false)
   const firstGroup = page.locator('[data-plugin-group]').first()
   const topBox = await controls.boundingBox()
-  assert.ok(topBox.y + topBox.height <= (await firstGroup.boundingBox()).y, 'Special controls belong above ordinary plugin groups')
+  const groupBox = await firstGroup.boundingBox()
+  assert.ok(topBox.y + topBox.height <= groupBox.y, 'Special controls belong above ordinary plugin groups')
+  assert.ok(Math.abs(topBox.x - groupBox.x) < 1 && Math.abs(topBox.width - groupBox.width) < 1,
+    'Overview controls must fill the same content width as the official plugin list')
   const remoteBox = await controls.locator('[data-next-remote-control]').boundingBox()
   const cuaBox = await cuaSettings.boundingBox()
   assert.ok(cuaBox.y >= remoteBox.y + remoteBox.height, 'Remote control and Computer Use must be stacked vertically')
@@ -246,7 +271,8 @@ try {
   const switchBox = await cuaSwitch.boundingBox()
   const gearBox = await permissionGear.boundingBox()
   assert.ok(Math.abs(gearBox.y + gearBox.height / 2 - switchBox.y - switchBox.height / 2) < 1)
-  assert.ok(gearBox.x >= switchBox.x + switchBox.width && gearBox.x - switchBox.x - switchBox.width <= 12)
+  assert.ok(switchBox.x >= gearBox.x + gearBox.width && switchBox.x - gearBox.x - gearBox.width <= 12,
+    'The permission gear must sit immediately to the left of the Computer Use switch')
   await page.locator('[data-plugin-panel]').evaluate(element => { for (let node = element; node; node = node.parentElement) node.scrollTop = 0 })
   await page.screenshot({ path: join(screenshots, 'plugin-controls.png'), animations: 'disabled' })
   await permissionGear.click()
@@ -256,6 +282,14 @@ try {
   assert.ok(permissionActions.every(item => item.action === 'query'), 'Opening the dialog must never prompt for permissions')
   assert.equal(await drag.isVisible(), false)
   await page.screenshot({ path: join(screenshots, 'plugin-permissions.png'), animations: 'disabled' })
+  await permissionDialog.press('Escape')
+  await permissionDialog.waitFor({ state: 'hidden' })
+  await page.evaluate(() => window.__nextTestOpenSettings('permissions'))
+  await permissionDialog.getByRole('group', { name: /屏幕录制|Screen recording/ }).getByText(/已拒绝|Denied/).waitFor()
+  await page.evaluate(() => window.__nextTestOpenSettings('permissions'))
+  assert.equal(await permissionDialog.count(), 1)
+  assert.equal(await context.pages().length, 1)
+  assert.ok(permissionActions.every(item => item.action === 'query'))
   await permissionDialog.press('Escape')
   await permissionDialog.waitFor({ state: 'hidden' })
   if (process.argv.includes('--computer-use')) {
@@ -436,21 +470,6 @@ try {
   await recoveryPage.goto('http://next-recovery.test/?locale=zh&platform=darwin&frame=true#profiles')
   await recoveryPage.getByRole('heading', { name: '可用 Profile', exact: true }).first().waitFor()
   await recoveryPage.screenshot({ path: join(screenshots, 'profile-selector.png'), animations: 'disabled' })
-  // The Host permission service opens the same official dialog in the utility window.
-  const permissionActionCount = permissionActions.length
-  await recoveryPage.goto('http://next-recovery.test/?locale=zh&platform=darwin&frame=true#general')
-  await recoveryPage.locator('[data-next-desktop-settings]').waitFor()
-  await recoveryPage.evaluate(() => { location.hash = 'permissions' })
-  const nativePermissions = recoveryPage.getByRole('dialog', { name: '系统权限' })
-  await nativePermissions.getByRole('group', { name: '屏幕录制' }).getByText('已拒绝').waitFor()
-  assert.ok((await nativePermissions.boundingBox()).width >= 600, 'The utility window must install shared permission dialog styles')
-  assert.ok(permissionActions.slice(permissionActionCount).every(item => item.action === 'query'))
-  await recoveryPage.screenshot({ path: join(screenshots, 'native-permissions.png'), animations: 'disabled' })
-  await nativePermissions.press('Escape')
-  await recoveryPage.waitForFunction(() => location.hash === '#general')
-  await recoveryPage.evaluate(() => { location.hash = 'permissions' })
-  await nativePermissions.waitFor()
-  await nativePermissions.getByRole('button', { name: '关闭', exact: true }).click()
   assert.deepEqual(recoveryErrors, [])
   await recoveryPage.close()
   controlState.safeMode = true

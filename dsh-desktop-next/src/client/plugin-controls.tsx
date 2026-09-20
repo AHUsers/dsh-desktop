@@ -4,8 +4,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { BundleInfo } from '@deepseek-ai/dsh-api-remotes/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
-import { Button, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Choice } from '../../../dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx'
+import { Button, IconSettingsOutline16, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Choice, MARKET_OPTIONS, marketBody, marketTitle } from '../../../dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx'
+import { en as desktopEn, zh as desktopZh, type DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 import { ComputerUseSettings } from './computer-use.tsx'
 
 const COMMUNITY = 'dsh-community-market'
@@ -27,6 +28,8 @@ export function registerPluginControls(ctx: Context): void {
 function PluginControls({ context, t: translate }: PropsLocale<'desktop-next'> & { context: Context }) {
   const zh = translate('language') === 'zh'
   const t = (cn: string, en: string): string => zh ? cn : en
+  const desktopCopy = zh ? desktopZh : desktopEn
+  const desktopText = (key: string): string => Object.hasOwn(desktopCopy, key) ? desktopCopy[key as DesktopSettingsLocaleKey] : key
   const [bundles, setBundles] = useState<BundleInfo[]>([])
   const [revision, refresh] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -72,22 +75,35 @@ function PluginControls({ context, t: translate }: PropsLocale<'desktop-next'> &
   const remote = bundles.find(row => row.name === REMOTE)
   const bothMarkets = community?.enabled === true && market?.enabled === true
   const locked = (row?: BundleInfo): boolean => loading || busy || !row || row.readOnlyReason !== undefined || row.error !== undefined
+  const openRemoteSettings = (): void => {
+    const trigger = document.querySelector<HTMLButtonElement>('[data-slot="sidebar.footer.action"] button[aria-label="手机连接"][aria-haspopup="dialog"]')
+    if (trigger) { setError(''); trigger.click() }
+    else setError(t('远程控制界面尚未就绪，请稍后重试。', 'Remote control is not ready yet. Try again shortly.'))
+  }
   return <div className="dshNextPluginControls" data-next-plugin-controls>
     <section className="dshDesktopSettingsGroup" data-next-markets aria-labelledby="next-market-title">
-      <div><h3 id="next-market-title">{t('插件市场', 'Plugin market')}</h3>
-        <p className="dshDesktopSettingsGroupIntro">{t('选择一个插件市场。切换市场会保留已安装的插件。', 'Choose one plugin market. Switching keeps your installed plugins.')}</p></div>
+      <div><h3 id="next-market-title">{desktopText('marketTitle')}</h3>
+        <p className="dshDesktopSettingsGroupIntro">{desktopText('marketIntro')}</p></div>
       <div className="dshNextMarketChoices" role="radiogroup" aria-labelledby="next-market-title">
-        <Choice title={t('社区插件市场', 'Community Market')} body={t('浏览社区来源，管理和安装插件。', 'Browse community sources and manage plugins.')}
-          selected={community?.enabled === true && !bothMarkets} disabled={locked(community)} action={() => { void change(COMMUNITY, true) }} />
-        <Choice title="DSH Market" body={t('使用 DSH Market 浏览和安装插件。', 'Browse and install plugins with DSH Market.')}
-          selected={market?.enabled === true && !bothMarkets} disabled={locked(market)} action={() => { void change(MARKET, true) }} />
+        {MARKET_OPTIONS.filter(option => option.id !== 'disabled').map(option => {
+          const isCommunity = option.id === 'community-market'
+          const row = isCommunity ? community : market
+          return <Choice key={option.id} title={marketTitle(option, desktopText)} body={marketBody(option, desktopText)}
+            badge={isCommunity ? desktopText('beta') : undefined} selected={row?.enabled === true && !bothMarkets}
+            disabled={locked(row)} action={() => { void change(isCommunity ? COMMUNITY : MARKET, true) }} />
+        })}
       </div>
       {bothMarkets && <p role="status" className="dshDesktopSettingsHint">{t('当前两个市场均已开启，请选择保留其中一个。', 'Both markets are currently enabled. Choose which one to keep.')}</p>}
     </section>
     <div className="dshNextPluginSections">
       <section className="dshDesktopSettingsGroup" data-next-remote-control aria-labelledby="next-remote-title">
         <div className="dshNextPluginHeading"><h3 id="next-remote-title">{t('远程控制', 'Remote control')}</h3>
-          <Switch label={t('启用远程控制', 'Enable remote control')} checked={remote?.enabled ?? false} disabled={locked(remote)} onChange={enabled => { void change(REMOTE, enabled) }} /></div>
+          <div className="dshNextPluginActions">
+            <Button variant="ghost" size="sm" className="dshNextSettingsGear" icon={<IconSettingsOutline16 />}
+              aria-label={t('远程控制设置', 'Remote control settings')} title={remote?.enabled ? t('远程控制设置', 'Remote control settings') : t('启用远程控制后打开设置', 'Enable remote control to open settings')}
+              disabled={!remote?.enabled || loading || busy} onClick={openRemoteSettings} />
+            <Switch label={t('启用远程控制', 'Enable remote control')} checked={remote?.enabled ?? false} disabled={locked(remote)} onChange={enabled => { void change(REMOTE, enabled) }} />
+          </div></div>
         <p className="dshDesktopSettingsHint">{t('通过 Agents Anywhere 从手机或其他设备连接。启用后，在侧边栏的“手机连接”中完成配对。', 'Connect from your phone or another device with Agents Anywhere. After enabling, pair it from Phone connection in the sidebar.')}</p>
       </section>
       <section className="dshDesktopSettingsGroup" aria-labelledby="next-computer-use-title">
