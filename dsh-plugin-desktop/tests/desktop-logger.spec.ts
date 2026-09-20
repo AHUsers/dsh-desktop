@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ElectronStderrLogger,
+  formatDesktopErrorDetails,
   installDesktopChildProcessLogging,
   installDesktopUncaughtExceptionLogging,
 } from '../src/desktop-logger.ts'
@@ -131,5 +132,26 @@ describe('ElectronStderrLogger', () => {
     expect(() => { logger.error('failed with Bearer abc.def.secret') }).not.toThrow()
     expect(stderrSpy).toHaveBeenCalledWith('failed with Bearer ****\n')
     stderrSpy.mockRestore()
+  })
+
+  it('expands the error cause chain with cause= lines (#952)', () => {
+    const { s, dir } = sink()
+    const logger = new ElectronStderrLogger(s)
+    const root = new Error('cannot resolve active package') as Error & { code?: string }
+    root.code = 'REQUEST_EXTENSION'
+    const wrapped = new Error('DeepSeek request extension preparation failed', { cause: root })
+    logger.errorCause(wrapped)
+    const day = todaySuffix()
+    const text = readFileSync(join(dir, `dsh-${day}.log`), 'utf8')
+    expect(text).toContain('DeepSeek request extension preparation failed')
+    expect(text).toContain('cause=')
+    expect(text).toContain('cannot resolve active package')
+  })
+
+  it('expands AggregateError parts and nested plain causes (#952)', () => {
+    expect(formatDesktopErrorDetails(new AggregateError([new Error('fiber-a down'), 'fiber-b down'], 'loader fibers failed')))
+      .toMatch(/loader fibers failed.*errors:.*fiber-a down.*fiber-b down/s)
+    const plain = new Error('wrapper', { cause: { code: 42 } })
+    expect(formatDesktopErrorDetails(plain)).toContain('cause=')
   })
 })

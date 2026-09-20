@@ -29,6 +29,25 @@ export interface DesktopChildProcessSource {
   off(event: 'child-process-gone', listener: (event: unknown, details: DesktopChildProcessDetails) => void): unknown
 }
 
+/** Render an error with its `cause` chain expanded, mirroring the upstream
+ * `formatErrorDetails()` convention: each level appends `cause=<detail>` and
+ * keeps its own `stack` so wrapped LLM/loader failures stay diagnosable (#952). */
+export function formatDesktopErrorDetails(error: unknown, seen = new Set<unknown>()): string {
+  if (error instanceof AggregateError) {
+    const parts = error.errors.map(part => formatDesktopErrorDetails(part, seen))
+    return `${error.message} [errors: ${parts.join(' | ')}]`
+  }
+  if (!(error instanceof Error)) return String(error)
+  if (seen.has(error)) return `${error.message} [circular cause]`
+  seen.add(error)
+  const details = [error.stack ?? error.message]
+  const cause = (error as { cause?: unknown }).cause
+  if (cause !== undefined) {
+    details.push(`cause=${formatDesktopErrorDetails(cause, seen)}`)
+  }
+  return details.join('\n')
+}
+
 /** Render signed Electron exit codes with their Windows NTSTATUS bit pattern. */
 export function formatDesktopExitCode(exitCode: number): string {
   return `${String(exitCode)} / 0x${(exitCode >>> 0).toString(16).padStart(8, '0')}`
@@ -92,7 +111,6 @@ export class ElectronStderrLogger implements DesktopLogger {
   }
 
   errorCause(cause: unknown): void {
-    const text = cause instanceof Error ? cause.stack ?? cause.message : String(cause)
-    this.error(text)
+    this.error(formatDesktopErrorDetails(cause))
   }
 }
