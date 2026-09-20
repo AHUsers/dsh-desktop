@@ -50,17 +50,15 @@ export function NextDesktopActions({ adapter, language }: { adapter: NextSetting
 function NextBrowserActions({ adapter, state, language }: { adapter: NextSettingsAdapter; state: DesktopState; language: string }) {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
-  const run = async (type: 'copy-browser' | 'copy-lan' | 'export-ca'): Promise<void> => {
+  const run = async (): Promise<void> => {
     setBusy(true); setFailure('')
-    try { await adapter.command({ type }) } catch (error) { setFailure(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+    try { await adapter.command({ type: 'export-ca' }) } catch (error) { setFailure(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
   }
-  const action = (type: Parameters<typeof run>[0], cn: string, en: string) => <button key={type} type="button" className="dshDesktopSettingsButton dshDesktopSettingsButtonSecondary" disabled={busy || state.busy} onClick={() => { void run(type) }}>{language.startsWith('zh') ? cn : en}</button>
-  if (!state.browserUrl) return null
+  if (!state.browserUrl || state.lan?.state !== 'ready') return null
   return <>
     {failure && <p role="alert" className="dshDesktopSettingsError">{failure}</p>}
     <div className="dshDesktopSettingsDialogActions">
-      {action('copy-browser', '复制本机登录链接', 'Copy local login link')}
-      {state.lan?.state === 'ready' && <>{action('copy-lan', '复制局域网登录链接', 'Copy LAN login link')}{action('export-ca', '导出 CA 证书', 'Export CA certificate')}</>}
+      <button type="button" className="dshDesktopSettingsButton dshDesktopSettingsButtonSecondary" disabled={busy || state.busy} onClick={() => { void run() }}>{language.startsWith('zh') ? '导出 CA 证书' : 'Export CA certificate'}</button>
     </div>
   </>
 }

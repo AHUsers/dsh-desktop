@@ -15,6 +15,7 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   syncWindowMaterial()
   contextBridge.exposeInMainWorld('desktopNext', {
     state: () => ipcRenderer.invoke(IPC.state),
+    browserLinks: () => ipcRenderer.invoke(IPC.browserLinks),
     command: (command: unknown) => ipcRenderer.invoke(IPC.command, command),
   })
   contextBridge.exposeInMainWorld('dshDesktop', { protocolVersion: 1 })

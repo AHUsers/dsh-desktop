@@ -340,6 +340,40 @@ const CSS = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
 }
+.dshDesktopSettingsUrlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+}
+.dshDesktopSettingsUrlRow a {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-wrap: normal;
+  padding-block: 4px;
+  text-decoration: none;
+}
+.dshDesktopSettingsUrlCopy {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.dshDesktopSettingsUrlCopy:hover { background: var(--dsw-alias-bg-layer-2); }
+.dshDesktopSettingsUrlCopy:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.dshDesktopSettingsUrlCopy:disabled { opacity: 0.5; cursor: wait; }
 .dshDesktopSettingsDialogBackdrop {
   position: fixed;
   z-index: 2147483002;

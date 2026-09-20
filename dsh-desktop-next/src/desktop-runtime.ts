@@ -6,7 +6,7 @@ import { DesktopBackendController } from './backend-controller.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DesktopPreferenceStore, parsePreferences } from './desktop-preferences.ts'
 import { DEFAULT_FEATURES, NextProfiles } from './profiles.ts'
-import { DEFAULT_PREFERENCES, type DesktopPreferences, type DesktopState, type NotificationOutcome } from './desktop-contract.ts'
+import { DEFAULT_PREFERENCES, type DesktopBrowserLinks, type DesktopPreferences, type DesktopState, type NotificationOutcome } from './desktop-contract.ts'
 import { DesktopDiagnostics } from './diagnostics.ts'
 import { NextRecovery } from './recovery.ts'
 import { maskSecrets } from './mask-secrets.ts'
@@ -154,15 +154,30 @@ export class NextDesktopRuntime {
       lan: this.lan?.snapshot() ?? null, checkpoint, logs: this.diagnostics.snapshot() }
   }
 
+  browserLinks(): DesktopBrowserLinks {
+    if (!this.auth || this.closing || this.recoveryMode || this.backend.state.phase !== 'ready' || !this.preferences.browserAccess || this.safeMode) return { localUrl: null, lanUrls: [] }
+    const localUrl = new URL(this.auth.url).href
+    const edge = this.lan?.snapshot()
+    const lanUrls = this.preferences.networkExposure === 'lan' && edge?.state === 'ready' && edge.actualPort
+      ? edge.addresses.map(address => {
+        const url = new URL(localUrl)
+        url.protocol = 'https:'; url.hostname = address; url.port = String(edge.actualPort)
+        return url.href
+      }) : []
+    return { localUrl, lanUrls }
+  }
+
   browserLink(lan = false): string {
-    if (!this.auth || this.backend.state.phase !== 'ready' || !this.preferences.browserAccess || this.safeMode) throw new Error('Browser access is unavailable')
-    const url = new URL(this.auth.url)
-    if (lan) {
-      const edge = this.lan?.snapshot()
-      if (edge?.state !== 'ready' || !edge.addresses[0] || !edge.actualPort) throw new Error('LAN HTTPS is unavailable')
-      url.protocol = 'https:'; url.hostname = edge.addresses[0]; url.port = String(edge.actualPort)
-    }
-    return url.href
+    const links = this.browserLinks()
+    const url = lan ? links.lanUrls[0] : links.localUrl
+    if (!url) throw new Error(lan ? 'LAN HTTPS is unavailable' : 'Browser access is unavailable')
+    return url
+  }
+
+  resolveBrowserLink(value: unknown): string {
+    const links = this.browserLinks()
+    if (typeof value !== 'string' || !value || (value !== links.localUrl && !links.lanUrls.includes(value))) throw new Error('Browser address is unavailable')
+    return value
   }
 
   async close(): Promise<void> {

@@ -47,11 +47,13 @@ Use **Settings → Desktop** in the official frontend, the tray’s **Desktop se
 - **Remote control:** disabled by default. After enabling it and restarting, configure it through the phone connection page in the official main interface. Connector state is scoped by Profile within Next home. Switching Profiles stops the previous Host and its remote connection.
 - **Desktop tools:** open the data/Profile/log directories, reload the interface, open developer tools, export diagnostics, and open a macOS/Windows terminal with this installation’s `dsh`, `pnpm` and Electron-backed `node`. The terminal selects the original Profile even while the main app is in safe mode.
 
+Sidebar extension entries reuse the original Desktop footer layout: entries stack vertically above Settings, with bounded scrolling to preserve the workspace list.
+
 ### Browser and LAN access
 
 Browser access is disabled by default. Enabling local access provides an authenticated loopback login link; enabling LAN access adds an HTTPS/WSS edge while the Host stays bound to `127.0.0.1`. Ports default to `0` (automatic). Access toggles do not restart the Host. Disabling browser access also disconnects existing browser WebSockets while preserving native streams and running tasks. Port changes require a Host restart. LAN addresses are sampled at startup; restart after a network change.
 
-The settings page can copy login links and export the installation’s public CA certificate. Trust that certificate on the other device after comparing its SHA-256 fingerprint. Login links grant access and should only be shared with trusted devices. The CA private key is sealed with OS-backed storage; if secure storage or a suitable LAN address is unavailable, LAN HTTPS stays closed and the UI shows the failure. Native renderer credentials are never copied into these links and are stripped at the LAN edge.
+The settings page displays the complete local login URL and a separate HTTPS login URL for every LAN address, including the browser `token`. Each row opens or copies that exact URL. The login links are read through sender-validated native IPC and kept out of general runtime state and diagnostics. The page can also export the installation’s public CA certificate. Trust that certificate on the other device after comparing its SHA-256 fingerprint. Login links grant access and should only be shared with trusted devices. The CA private key is sealed with OS-backed storage; if secure storage or a suitable LAN address is unavailable, LAN HTTPS stays closed and the UI shows the failure. Native renderer credentials are never copied into these links and are stripped at the LAN edge.
 
 ### Recovery
 

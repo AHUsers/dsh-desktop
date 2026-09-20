@@ -41,6 +41,7 @@ try {
   await context.grantPermissions(['local-network-access'], { origin: streamBaseUrl })
   await context.addCookies([{ url: streamBaseUrl, name: cookie.slice(0, cookieSeparator), value: cookie.slice(cookieSeparator + 1) }])
   const controlCommands = []
+  const loginToken = 'L'.repeat(43)
   let rejectPreference = false
   const controlState = {
     selected: 'default', profiles: ['default', 'work', 'broken'], unavailableProfiles: ['broken'], features: { market: false, remoteControl: false },
@@ -52,6 +53,12 @@ try {
     checkpoint: { created: new Date().toISOString() }, logs: 'Headless UI fixture; native actions are recorded only.',
   }
   await context.exposeFunction('__nextTestState', () => structuredClone(controlState))
+  const browserLinks = () => ({
+    localUrl: controlState.browserUrl ? controlState.browserUrl + '?token=' + loginToken : null,
+    lanUrls: controlState.browserUrl && controlState.lan?.state === 'ready'
+      ? controlState.lan.addresses.map(address => `https://${address}:${controlState.lan.actualPort}/?token=${loginToken}`) : [],
+  })
+  await context.exposeFunction('__nextTestBrowserLinks', browserLinks)
   await context.exposeFunction('__nextTestCommand', command => {
     if (command.type === 'preferences' && rejectPreference) { rejectPreference = false; throw new Error('Fixture: preference save rejected') }
     controlCommands.push(command)
@@ -59,7 +66,7 @@ try {
       controlState.preferences = command.preferences
       controlState.browserUrl = command.preferences.browserAccess ? streamBaseUrl + '/' : null
       controlState.lan = command.preferences.networkExposure === 'lan'
-        ? { state: 'ready', actualPort: 43121, addresses: ['192.168.1.20'], caFingerprint: 'a'.repeat(64), errorCode: null }
+        ? { state: 'ready', actualPort: 43121, addresses: ['192.168.1.20', '10.0.0.20'], caFingerprint: 'a'.repeat(64), errorCode: null }
         : null
     }
     if (command.type === 'switch') controlState.selected = command.name
@@ -67,7 +74,7 @@ try {
     if (command.type === 'create') controlState.profiles.push(command.name)
   })
   await context.addInitScript(() => {
-    window.desktopNext = { state: () => window.__nextTestState(), command: command => window.__nextTestCommand(command) }
+    window.desktopNext = { state: () => window.__nextTestState(), browserLinks: () => window.__nextTestBrowserLinks(), command: command => window.__nextTestCommand(command) }
   })
   // Serve the Desktop document without the browser Host's inline injections.
   // The published entry must request them through its Desktop boot contract.
@@ -102,6 +109,31 @@ try {
   await page.getByRole('button', { name: /^(继续|Continue)$/ }).click()
   await page.getByRole('button', { name: /^(稍后配置|Configure later)$/ }).click()
   await drag.waitFor({ state: 'visible' })
+  // Simulate multiple extension entries in the official footer seat and check real geometry.
+  const footer = page.locator('[data-slot="sidebar.footer.action"]')
+  await footer.evaluate(element => {
+    for (const label of ['手机连接', '插件市场', '扩展入口']) {
+      const button = document.createElement('button')
+      button.dataset.nextFooterFixture = ''
+      button.textContent = label
+      button.style.cssText = 'width:calc(100% + 4px);margin:-2px;padding:12px;text-align:left;border-radius:12px'
+      element.appendChild(button)
+    }
+  })
+  const footerEntries = footer.locator('[data-next-footer-fixture]')
+  const footerBoxes = await footerEntries.evaluateAll(elements => elements.map(element => {
+    const box = element.getBoundingClientRect()
+    return { x: box.x, y: box.y, width: box.width, height: box.height }
+  }))
+  assert.equal(footerBoxes.length, 3)
+  for (let i = 1; i < footerBoxes.length; i++) {
+    assert.ok(footerBoxes[i].y >= footerBoxes[i - 1].y + footerBoxes[i - 1].height)
+    assert.equal(footerBoxes[i].x, footerBoxes[0].x)
+    assert.equal(footerBoxes[i].width, footerBoxes[0].width)
+  }
+  mkdirSync(screenshots, { recursive: true })
+  await page.screenshot({ path: join(screenshots, 'sidebar-footer.png'), animations: 'disabled' })
+  await footerEntries.evaluateAll(elements => elements.forEach(element => element.remove()))
 
   const checkDrag = async () => {
     const geometry = await drag.evaluate(element => {
@@ -209,35 +241,45 @@ try {
   await settings.getByRole('radio', { name: /dsh-community-market/ }).click()
   await page.waitForFunction(() => [...document.querySelectorAll('[role="radio"]')].some(el => /dsh-community-market/.test(el.textContent) && el.getAttribute('aria-checked') === 'true'))
   assert.deepEqual(controlCommands.at(-1), { type: 'features', features: { market: true, remoteControl: false } })
-  // Browser actions live beside the access addresses, with availability following the toggles.
+  // Each local/LAN login link has its own row and native open/copy target.
   const webSettings = settings.locator('section[aria-labelledby="dsh-desktop-web-title"]')
   const browserAccess = webSettings.getByRole('switch', { name: /允许在浏览器中打开|Allow opening this Profile in a browser/ })
   const lanAccess = webSettings.getByRole('switch', { name: /局域网访问|Local-network access/ })
-  const copyBrowser = webSettings.getByRole('button', { name: /复制本机登录链接|Copy local login link/ })
-  const copyLan = webSettings.getByRole('button', { name: /复制局域网登录链接|Copy LAN login link/ })
+  const loginRows = webSettings.locator('.dshDesktopSettingsUrlRow')
   const exportCa = webSettings.getByRole('button', { name: /导出 CA 证书|Export CA certificate/ })
-  assert.equal(await copyBrowser.count(), 0)
+  assert.equal(await loginRows.count(), 0)
+  assert.equal(await settings.getByRole('button', { name: /复制本机登录链接|Copy local login link|复制局域网登录链接|Copy LAN login link/ }).count(), 0)
   await browserAccess.click()
-  await copyBrowser.click()
-  assert.deepEqual(controlCommands.at(-1), { type: 'copy-browser' })
-  assert.equal(await copyLan.count(), 0)
+  await loginRows.first().waitFor()
+  assert.equal(await loginRows.count(), 1)
   assert.equal(await exportCa.count(), 0)
   await lanAccess.click()
-  await copyLan.click()
-  assert.deepEqual(controlCommands.at(-1), { type: 'copy-lan' })
+  await loginRows.nth(2).waitFor()
+  assert.equal(await loginRows.count(), 3)
+  for (const [index, url] of [browserLinks().localUrl, ...browserLinks().lanUrls].entries()) {
+    const row = loginRows.nth(index)
+    const link = row.getByRole('link')
+    assert.equal(await link.textContent(), url)
+    assert.equal(await link.getAttribute('href'), url)
+    await row.getByRole('button', { name: /复制地址|Copy address/ }).click()
+    await row.locator('button[title="已复制"], button[title="Copied"]').waitFor()
+    assert.deepEqual(controlCommands.at(-1), { type: 'copy-browser-url', url })
+    await link.click()
+    assert.deepEqual(controlCommands.at(-1), { type: 'open-browser-url', url })
+  }
   await exportCa.click()
   assert.deepEqual(controlCommands.at(-1), { type: 'export-ca' })
-  assert.equal(await settings.getByRole('button', { name: /复制本机登录链接|Copy local login link/ }).count(), 1)
+  await page.waitForFunction(() => !document.querySelector('.dshDesktopSettingsUrlCopy[title="已复制"], .dshDesktopSettingsUrlCopy[title="Copied"]'))
   await settings.getByRole('heading').first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-settings.png'), animations: 'disabled' })
   await webSettings.evaluate(element => element.scrollIntoView({ block: 'start' }))
   await page.screenshot({ path: join(screenshots, 'desktop-access-settings.png'), animations: 'disabled' })
   await lanAccess.click()
-  await copyLan.waitFor({ state: 'hidden' })
+  await loginRows.nth(1).waitFor({ state: 'hidden' })
   assert.equal(await exportCa.count(), 0)
-  assert.equal(await copyBrowser.isVisible(), true)
+  assert.equal(await loginRows.count(), 1)
   await browserAccess.click()
-  await copyBrowser.waitFor({ state: 'hidden' })
+  await loginRows.first().waitFor({ state: 'hidden' })
   await settings.locator('#dsh-desktop-notifications-title').scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(screenshots, 'desktop-notification-settings.png'), animations: 'disabled' })
   await settings.getByRole('radio', { name: /^work/ }).click()
@@ -296,10 +338,11 @@ try {
   assert.equal(await webPage.evaluate(() => window.desktopNext === undefined), true)
   assert.equal(await webPage.evaluate(() => globalThis.__DSH_TRANSPORT__?.ownsHost === true), false)
   assert.equal(await webPage.evaluate(() => window.dshDesktop === undefined), true)
+  assert.equal(await webPage.locator('#dsh-desktop-sidebar-footer-styles').count(), 0)
   await webContext.close()
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
-  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, browser actions beside access addresses, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
+  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: stacked sidebar extension entries, homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, per-address login URL rows with exact open/copy targets, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
   console.log(`Screenshots: ${screenshots}`)
 } catch (error) {
   if (recoveryPage && !recoveryPage.isClosed()) {

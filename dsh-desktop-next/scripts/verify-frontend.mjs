@@ -36,5 +36,6 @@ for (const platform of ['darwin', 'win32', 'linux']) {
   assert.equal(typeof exposed.get('dshDesktopBoot')?.ready, 'function')
   assert.equal(typeof exposed.get('__DSH_DIRECTORY_PICKER__')?.pick, 'function')
   assert.equal(typeof exposed.get('desktopNext')?.command, 'function')
+  assert.equal(typeof exposed.get('desktopNext')?.browserLinks, 'function')
 }
 console.log('Next frontend check passed: official alpha.2 entry and independent sandboxed preloads for macOS, Windows and Linux.')

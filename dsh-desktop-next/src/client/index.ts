@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { installDesktopSettingsStyles } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-styles.ts'
+import { installSidebarFooterStyles } from '../../../dsh-plugin-desktop-beta/src/client/sidebar-footer-styles.ts'
 import { NextSettingsAdapter } from './settings-adapter.ts'
 import { NextDesktopSettings, NextDesktopActions } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
@@ -38,6 +39,7 @@ export function apply(ctx: Context): void {
     en: { 'sidebar.open': 'Open sidebar', settings: 'Desktop', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'Data in this temporary environment is removed when you leave.', recovery: 'Open recovery assistant' },
   }), 'Next window control labels')
   if (window.desktopNext) {
+    ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
     ctx.effect(installDesktopSettingsStyles, 'Shared Desktop settings styles')
     const t = ctx.locale.bind('desktop-next')

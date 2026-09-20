@@ -4,6 +4,7 @@ import {
   useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode,
 } from 'react'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { Check, Copy } from 'lucide-react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   DesktopMarketProvider, DesktopProfileView, DesktopSettingsApi, DesktopSettingsView,
@@ -306,6 +307,39 @@ function marketBody(option: (typeof MARKET_OPTIONS)[number], t: Translate): Reac
       <RepositoryLink href={AWESOME_DSH_PLUGIN_URL}>awesome-dsh-plugin</RepositoryLink>
     </>
   )
+}
+
+function DesktopBrowserUrl({ url, api, t, onOpen }: {
+  url: string
+  api: DesktopSettingsApi
+  t: Translate
+  onOpen: React.MouseEventHandler<HTMLAnchorElement>
+}) {
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
+  const link = <a href={url} onClick={onOpen} target="_blank" rel="noopener noreferrer">{url}</a>
+  if (!api.copyBrowser) return link
+  const copy = async (): Promise<void> => {
+    setBusy(true); setFailed(false); setCopied(false)
+    try { await api.copyBrowser!(url); setCopied(true) } catch { setFailed(true) } finally { setBusy(false) }
+  }
+  return <>
+    <div className="dshDesktopSettingsUrlRow">
+      {link}
+      <button type="button" className="dshDesktopSettingsUrlCopy" disabled={busy}
+        aria-label={`${t('copyBrowserUrl')} ${new URL(url).host}`} title={t(copied ? 'browserUrlCopied' : 'copyBrowserUrl')}
+        onClick={() => { void copy() }}>
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+      </button>
+    </div>
+    {failed && <p role="alert" className="dshDesktopSettingsError">{t('operationFailed')}</p>}
+  </>
 }
 
 /** Render the Desktop settings page. */
@@ -771,12 +805,12 @@ export function DesktopSettingsSection({
             )}
           </div>
         )}
-        {desktopBrowserUrlsShouldRender(browserAccess, networkExposure) && view !== undefined && (
+        {desktopBrowserUrlsShouldRender(browserAccess, networkExposure) && view !== undefined && view.web.localUrl !== '' && (
           <div className="dshDesktopSettingsUrls">
             <span className="dshDesktopSettingsChoiceTitle">{t('browserUrls')}</span>
-            <a href={view.web.localUrl} onClick={event => openBrowser(event, view.web.localUrl)} target="_blank" rel="noopener noreferrer">{view.web.localUrl}</a>
+            <DesktopBrowserUrl key={view.web.localUrl} url={view.web.localUrl} api={api} t={t} onOpen={event => openBrowser(event, view.web.localUrl)} />
             {view.web.lanUrls.length > 0 && <span className="dshDesktopSettingsChoiceTitle">{t('lanHttpsUrls')}</span>}
-            {view.web.lanUrls.map(url => <a href={url} onClick={event => openBrowser(event, url)} key={url} target="_blank" rel="noopener noreferrer">{url}</a>)}
+            {view.web.lanUrls.map(url => <DesktopBrowserUrl key={url} url={url} api={api} t={t} onOpen={event => openBrowser(event, url)} />)}
           </div>
         )}
         {browserActions}

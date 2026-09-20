@@ -203,6 +203,12 @@ async function command(value: unknown): Promise<void> {
     if (type === 'open-backups') { privateDirectory(runtime.recovery.directory); await openPath(runtime.recovery.directory); return }
     if (type === 'open-browser' || type === 'open-lan') { await shell.openExternal(runtime.browserLink(type === 'open-lan')); return }
     if (type === 'copy-browser' || type === 'copy-lan') { clipboard.writeText(runtime.browserLink(type === 'copy-lan')); return }
+    if (type === 'open-browser-url' || type === 'copy-browser-url') {
+      const url = runtime.resolveBrowserLink(input.url)
+      if (type === 'copy-browser-url') clipboard.writeText(url)
+      else await shell.openExternal(url)
+      return
+    }
     if (type === 'export-ca' || type === 'diagnostics') {
       const certificate = runtime.lan?.caCertificate
       if (type === 'export-ca' && !certificate) throw new Error('LAN certificate is unavailable')
@@ -291,6 +297,7 @@ async function main(): Promise<void> {
     runtime.report(new Error(message.slice(0, 4096)))
   })
   ipcMain.handle(IPC.state, event => { assertDesktopSender(event); return state() })
+  ipcMain.handle(IPC.browserLinks, event => { assertDesktopSender(event); return runtime.browserLinks() })
   ipcMain.handle(IPC.material, event => { assertSender(event, mainWindow, APP_URL); return windowMaterial(runtime.preferences) })
   ipcMain.handle(IPC.command, (event, value: unknown) => { assertDesktopSender(event); return command(value) })
   let picking: Promise<string | null> | undefined

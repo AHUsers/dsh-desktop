@@ -1,4 +1,4 @@
-/** Renderer-safe Desktop data. Native credentials and filesystem targets stay in main. */
+/** General renderer state omits credentials; browser login links use a separate native operation. */
 import type { Features } from './profiles.ts'
 import type { DesktopLanHttpsRuntimeSnapshot } from './lan-https-runtime.ts'
 
@@ -50,7 +50,14 @@ export interface DesktopState {
   logs: string
 }
 
+/** Login links fetched explicitly by the native settings page, outside general state/diagnostics. */
+export interface DesktopBrowserLinks {
+  localUrl: string | null
+  lanUrls: string[]
+}
+
 export type DesktopCommand =
+  | { type: 'open-browser-url' | 'copy-browser-url'; url: string }
   | { type: 'create' | 'switch' | 'delete'; name: string }
   | { type: 'features'; features: Features }
   | { type: 'preferences'; preferences: DesktopPreferences }
@@ -62,6 +69,7 @@ export type DesktopCommand =
 
 export interface DesktopBridge {
   state(): Promise<DesktopState>
+  browserLinks(): Promise<DesktopBrowserLinks>
   command(command: DesktopCommand): Promise<void>
 }
 

@@ -21,6 +21,7 @@ vi.mock('../src/desktop-runtime.ts', () => ({ NextDesktopRuntime: class {
   initialize() {}
   start = fixture.start
   close = fixture.close
+  browserLinks() { return { localUrl: null, lanUrls: [] } }
   state() { return { selected: 'default', profiles: ['default'], unavailableProfiles: [], features: { remoteControl: false, market: true },
     preferences: this.preferences, phase: this.recoveryMode ? 'recovery' : 'error', busy: this.busy, failure: 'Fixture Host failure', safeMode: false,
     home: 'temporary', browserUrl: null, lan: null, checkpoint: null, logs: '' } }
@@ -105,6 +106,10 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(state(sender).phase).toBe('error')
     expect(() => state({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     expect(() => state({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
+    const browserLinks = fixture.handlers.get('dsh-next:browser-links')!
+    expect(browserLinks(sender)).toEqual({ localUrl: null, lanUrls: [] })
+    expect(() => browserLinks({ ...sender, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
+    expect(() => browserLinks({ sender: {}, senderFrame: { url: 'dsh-app://app/' } })).toThrow('Rejected')
     await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: ['restart'] })).rejects.toThrow('Invalid Next command')
     await expect(fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls', page: ['general'] })).rejects.toThrow('Invalid controls page')
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'controls' })
