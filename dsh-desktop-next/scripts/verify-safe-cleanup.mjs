@@ -1,7 +1,7 @@
 /** Exercise the actual Electron filesystem implementation without opening windows. */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -18,7 +18,7 @@ if (!process.versions.electron) {
   assert.equal(child.status, 0, 'Electron safe-home cleanup verification failed')
 } else {
   const { NextDesktopRuntime } = await import('../lib/desktop-runtime.js')
-  for (const action of ['close', 'normal-mode']) {
+  for (const action of ['close', 'normal-mode']) for (const fixture of ['readonly', 'external-junction', 'ancestor-junction']) {
     const root = mkdtempSync(join(tmpdir(), 'next-electron-safe-cleanup-'))
     assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep))
     const runtime = new NextDesktopRuntime({ home: join(root, 'home'), root, executable: process.execPath,
@@ -31,17 +31,25 @@ if (!process.versions.electron) {
       runtime.safeMode = true
       await runtime.start()
       const safeHome = runtime.terminalTarget().homeDir
-      const sentinel = join(root, 'keep.txt')
+      const target = fixture === 'external-junction' ? join(root, 'bundle') : root
+      mkdirSync(target, { recursive: true })
+      const sentinel = join(target, 'keep.txt')
+      // Keep targets writable: a read-only sentinel can hide accidental traversal
+      // by making the unsafe deleter fail before it removes the target's contents.
       writeFileSync(sentinel, 'outside safe home')
-      chmodSync(sentinel, 0o444)
-      const readonly = join(safeHome, 'readonly.txt')
-      writeFileSync(readonly, 'temporary')
-      chmodSync(readonly, 0o444)
-      // Development homes live under the bundle targeted by the Profile junction.
-      symlinkSync(root, join(safeHome, 'bundle-fallback'), 'junction')
+      if (fixture === 'readonly') {
+        const readonly = join(safeHome, 'readonly.txt')
+        writeFileSync(readonly, 'temporary')
+        chmodSync(readonly, 0o444)
+      } else {
+        // Match the physical bundle fallback installed by loadNextProfile.
+        const modules = join(safeHome, 'profiles', 'node_modules')
+        mkdirSync(modules, { recursive: true })
+        symlinkSync(target, join(modules, 'dsh-desktop-next'), 'junction')
+      }
       if (action === 'close') await runtime.close()
       else await runtime.restart(() => { runtime.safeMode = false })
-      assert.equal(existsSync(safeHome), false, `${action}: safe home must actually be deleted`)
+      assert.equal(existsSync(safeHome), false, `${action}/${fixture}: safe home must actually be deleted`)
       assert.equal(readFileSync(sentinel, 'utf8'), 'outside safe home', 'Junction target must remain untouched')
       assert.doesNotMatch(runtime.diagnostics.snapshot(), /cleanup failed/)
     } finally {
@@ -49,5 +57,5 @@ if (!process.versions.electron) {
       await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
     }
   }
-  console.log(`Electron ${process.versions.electron} / Node ${process.versions.node}: safe-home close and restart preserve junction targets and remove read-only temporary files.`)
+  console.log(`Electron ${process.versions.electron} / Node ${process.versions.node}: 6 safe-home close/restart cases pass for read-only files, writable external junction targets and writable ancestor junction targets.`)
 }

@@ -206,8 +206,9 @@ export class NextDesktopRuntime {
     if (!home) return
     this.safeHome = undefined
     try {
-      // Use async rm: Electron's Windows rmSync can fail on read-only files
-      // and ancestor junctions created by the Profile's bundle fallback.
+      // Use async rm: Electron's Windows rmSync follows directory junctions
+      // into their targets and also fails on read-only files. Profiles link
+      // back to the application bundle, which must never be traversed here.
       // Retry directory handles retained briefly after the Host exits.
       await rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
     } catch (error) {
