@@ -1,6 +1,6 @@
 /** AA-inspired first-run flow, using the existing Desktop theme and controls. */
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowLeft, ArrowRight, Check, LifeBuoy, LoaderCircle, Monitor, Smartphone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, LifeBuoy, LoaderCircle } from 'lucide-react'
 import { Button } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/button.tsx'
 import { Switch } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/switch.tsx'
 import { RadioGroup, RadioGroupItem } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/radio-group.tsx'
@@ -9,7 +9,9 @@ import { DesktopFrame } from '../../../dsh-plugin-desktop-beta/src/native-ui/sha
 import type { DesktopBridge, DesktopState } from '../desktop-contract.ts'
 import './onboarding.css'
 
-const appIcon = new URL('../../build/app-icon-mac.png', import.meta.url).href
+const whaleArtwork = new URL('../../build/app-icon.icon/Assets/DeepSeek.svg?no-inline', import.meta.url).href
+// Reuse the phone artwork from the official AA onboarding instead of a schematic card.
+const phoneArtwork = new URL('./assets/agents-anywhere-phone.webp', import.meta.url).href
 type Market = 'none' | 'community' | 'dsh'
 
 export function Onboarding({ state, locale, bridge }: { state: DesktopState; locale: 'zh' | 'en'; bridge: DesktopBridge }) {
@@ -28,11 +30,11 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
   const animation = useRef<Animation | undefined>(undefined)
   const disabled = busy || transitioning
   const steps = [t('欢迎', 'Welcome'), t('插件市场', 'Plugin market'), t('远程控制', 'Remote control'), t('恢复模式', 'Recovery')]
-  const titles = [t('欢迎使用\nDSH Desktop Next', 'Welcome to\nDSH Desktop Next'), t('用插件，\n拓展更多可能。', 'Make room\nfor more possibilities.'), t('你的桌面，\n也在手边。', 'Your desktop.\nWithin reach.'), t('遇到问题，\n从这里恢复。', 'A way back,\nwhen you need it.')]
+  const titles = [t('欢迎使用\nDSH Desktop Next', 'Welcome to\nDSH Desktop Next'), t('用插件，\n拓展更多可能。', 'Make room\nfor more possibilities.'), t('离开电脑，\n也能继续。', 'Keep going.\nAway from your desk.'), t('遇到问题，\n从这里恢复。', 'A way back,\nwhen you need it.')]
   const descriptions = [
     t(`为 Profile「${state.selected}」选好常用功能。\n几步设置，就可以开始。`, `Set up the essentials for Profile “${state.selected}”.\nA few choices, then you’re ready to go.`),
     t('选择一个插件市场，浏览和安装社区插件。\n也可以暂不开启，以后在插件页面调整。', 'Choose a market to browse and install community plugins.\nYou can also leave it off and decide later in Plugins.'),
-    t('通过 Agents Anywhere，从手机或其他电脑\n连接这里，继续你的工作。', 'Connect through Agents Anywhere from your phone\nor another computer, and pick up where you left off.'),
+    t('通过 Agents Anywhere，在手机或其他电脑上，\n继续与你的 Agent 对话。', 'Use Agents Anywhere on your phone or another computer\nto keep the conversation going.'),
     t('恢复助手可以在 Profile 无法启动时打开。\n先检查问题，再选择合适的恢复方式。', 'The recovery assistant works even when a Profile cannot start.\nCheck what happened, then choose how to recover.'),
   ]
 
@@ -90,14 +92,17 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
     <main className="next-onboarding-main" aria-busy={busy}>
       <div key={page} ref={slide} className="next-onboarding-slide" data-page={page} style={{ '--entry-x': `${direction * 22}px` } as CSSProperties}>
         <section className="next-onboarding-copy" aria-labelledby="onboarding-title">
-          <p className="next-onboarding-eyebrow">{page === 0 ? 'DSH DESKTOP NEXT' : steps[page]}</p>
+          {page > 0 && <p className="next-onboarding-eyebrow">{steps[page]}</p>}
           <h1 id="onboarding-title" tabIndex={-1}>{titles[page]!.split('\n').map((line, i) => <span className="next-onboarding-reveal" key={i} style={{ animationDelay: `${80 + i * 130}ms` }}>{line}</span>)}</h1>
           <p className="next-onboarding-description next-onboarding-reveal">{descriptions[page]}</p>
+          {page === 2 && <div className="next-onboarding-remote-option next-onboarding-reveal">
+            <div className="next-onboarding-toggle"><label htmlFor="onboarding-remote">{t('启用远程控制', 'Enable remote control')}</label><Switch id="onboarding-remote" checked={remote} disabled={disabled} onCheckedChange={setRemote} /></div>
+            <p>{t('完成后，在侧边栏的“手机连接”中登录并配对。', 'After setup, sign in and pair your device in “Phone connect” in the sidebar.')}</p>
+          </div>}
         </section>
         <aside className="next-onboarding-panel next-onboarding-reveal" aria-label={steps[page]}>
-          {page === 0 && <div className="next-onboarding-welcome">
-            <img src={appIcon} width="240" height="240" alt="" draggable={false} />
-            <p>Profile <strong>{state.selected}</strong></p>
+          {page === 0 && <div className="next-onboarding-wordmark" aria-hidden="true">
+            <span className="next-onboarding-whale" style={{ maskImage: `url("${whaleArtwork}")` }} /><span>NEXT</span>
           </div>}
           {page === 1 && <RadioGroup aria-label={t('插件市场', 'Plugin market')} value={market} disabled={disabled} onValueChange={value => setMarket(value as Market)}>
             {markets.map(option => <label className="next-onboarding-choice" data-selected={market === option.value} key={option.value}>
@@ -105,12 +110,9 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
               <RadioGroupItem value={option.value} aria-labelledby={`market-${option.value}`} />
             </label>)}
           </RadioGroup>}
-          {page === 2 && <div className="next-onboarding-remote">
-            <div className="next-onboarding-devices" aria-hidden="true"><Monitor /><span /><Smartphone /></div>
-            <div className="next-onboarding-toggle"><label htmlFor="onboarding-remote">{t('启用远程控制', 'Enable remote control')}</label><Switch id="onboarding-remote" checked={remote} disabled={disabled} onCheckedChange={setRemote} /></div>
-            <p>{t('开启后，在侧边栏的“手机连接”中登录并配对。', 'Once enabled, sign in and pair your device in “Phone connect” in the sidebar.')}</p>
-            <p className="next-onboarding-note">{t('此处仅开启功能，不会自动连接你的账号。', 'This enables the feature. Account pairing is a separate step.')}</p>
-          </div>}
+          {page === 2 && <figure className="next-onboarding-phone" aria-hidden="true">
+            <img src={phoneArtwork} width="800" height="1649" alt="" draggable={false} />
+          </figure>}
           {page === 3 && <div className="next-onboarding-recovery">
             <LifeBuoy aria-hidden="true" />
             <ol>

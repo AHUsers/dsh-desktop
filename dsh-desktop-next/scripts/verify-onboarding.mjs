@@ -16,6 +16,7 @@ const context = await browser.newContext({ viewport: { width: 1040, height: 720 
 const page = await context.newPage()
 const errors = []
 page.on('pageerror', error => errors.push(error.message))
+page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
 let rejectSave = false
 const commands = []
 const state = {
@@ -46,7 +47,9 @@ const capture = name => page.screenshot({ path: join(screenshots, `onboarding-${
 try {
   await open()
   assert.equal(await page.getByRole('button', { name: '上一步', exact: true }).count(), 0)
-  assert.equal(await page.locator('img').evaluate(image => image.complete && image.naturalWidth > 0), true)
+  assert.equal(await page.locator('.next-onboarding-eyebrow, img').count(), 0)
+  assert.equal(await page.locator('.next-onboarding-wordmark').innerText(), 'NEXT')
+  assert.notEqual(await page.locator('.next-onboarding-whale').evaluate(mark => getComputedStyle(mark).maskImage), 'none')
   await capture('welcome')
   await next(1)
   const back = await page.getByRole('button', { name: '上一步', exact: true }).boundingBox()
@@ -56,6 +59,9 @@ try {
   await capture('market')
   await next(2)
   await page.getByRole('switch', { name: '启用远程控制', exact: true }).check()
+  assert.equal(await page.locator('.next-onboarding-copy [role="switch"]').count(), 1)
+  assert.equal(await page.locator('.next-onboarding-panel [role="switch"]').count(), 0)
+  assert.equal(await page.locator('.next-onboarding-phone img').evaluate(image => image.complete && image.naturalWidth > 0), true)
   await capture('remote')
   await page.getByRole('button', { name: '上一步', exact: true }).click()
   await page.locator('[data-page="1"]').waitFor()
