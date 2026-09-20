@@ -16,7 +16,7 @@ const BOOT = '<script>globalThis.__DSH_BOOT_READY__ = Promise.withResolvers()</s
  * @param root - Packaged Web dist directory.
  * @returns Static response, or a missing/invalid path response.
  */
-export async function serveWebDocument(request: Request, root: string): Promise<Response> {
+export async function serveWebDocument(request: Request, root: string, waitForHost = true): Promise<Response> {
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 })
   const url = new URL(request.url)
   let pathname: string
@@ -29,7 +29,7 @@ export async function serveWebDocument(request: Request, root: string): Promise<
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Response(null, { status: 404 })
     throw error
   }
-  const content = pathname === '/' || pathname === '/index.html'
+  const content = waitForHost && (pathname === '/' || pathname === '/index.html')
     ? body.toString().replace('<head>', '<head>' + BOOT) : new Uint8Array(body)
   return new Response(request.method === 'HEAD' ? null : content, {
     headers: { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' },

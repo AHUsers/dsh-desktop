@@ -83,6 +83,8 @@ export interface DesktopSettingsApi {
   deleteProfile(name: string): Promise<DesktopSettingsView>
   selectAa?(enabled: boolean): Promise<DesktopRestartAcceptance>
   selectMarket(provider: DesktopMarketProvider): Promise<DesktopRestartAcceptance>
+  /** Optional native launcher for links whose credentials remain in main. */
+  openBrowser?(url: string): Promise<void>
   openTerminal(): Promise<void>
   restart(): Promise<void>
   restartToRecovery(): Promise<void>

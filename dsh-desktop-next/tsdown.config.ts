@@ -1,9 +1,8 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig([
-  { entry: { shell: 'src/controls/standalone.ts' }, outDir: 'lib', format: 'iife', platform: 'browser', target: 'es2022', fixedExtension: false, dts: false, clean: false, outputOptions: { entryFileNames: 'shell.js' } },
   {
-    entry: { 'desktop-cli': 'src/desktop-cli.ts', 'desktop-runtime': 'src/desktop-runtime.ts', 'controls-styles': 'src/controls/styles.ts', main: 'src/main.ts', host: 'src/host/index.ts', profiles: 'src/profiles.ts', extensions: 'src/extensions.ts', webserver: 'src/webserver.ts', 'host-process': 'src/host-process.ts', 'web-document': 'src/web-document.ts' },
+    entry: { 'desktop-cli': 'src/desktop-cli.ts', 'desktop-runtime': 'src/desktop-runtime.ts', main: 'src/main.ts', host: 'src/host/index.ts', profiles: 'src/profiles.ts', extensions: 'src/extensions.ts', webserver: 'src/webserver.ts', 'host-process': 'src/host-process.ts', 'web-document': 'src/web-document.ts' },
     outDir: 'lib', format: 'esm', platform: 'node', target: 'es2024',
     fixedExtension: false, dts: false, clean: true,
     deps: { neverBundle: ['electron'] },
@@ -18,7 +17,8 @@ export default defineConfig([
     entry: { client: 'src/client/index.ts' },
     outDir: 'lib', format: 'cjs', platform: 'browser', target: 'es2022',
     fixedExtension: false, dts: false, clean: false,
-    deps: { neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives'] },
+    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    deps: { neverBundle: ['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'], alwaysBundle: ['lucide-react'] },
     outputOptions: {
       entryFileNames: 'client.js',
       banner: 'window.__ModuleLoader__.load({ id: "dsh-desktop-next", factory: (require) => {',

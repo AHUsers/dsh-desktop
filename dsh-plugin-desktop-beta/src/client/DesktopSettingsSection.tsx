@@ -42,8 +42,17 @@ export interface DesktopSettingsSectionInjected {
   readonly initialMode: DesktopShellSettings['mode']
   readonly micaSupported: boolean
   readonly setMode: (mode: DesktopShellSettings['mode']) => Promise<void>
-  readonly desktopSettings: SettingsScope<DesktopShellSettings>
-  readonly notificationSettings: SettingsScope<DesktopNotificationSettings>
+  readonly desktopSettings: Pick<SettingsScope<DesktopShellSettings>, 'getSnapshot' | 'subscribe' | 'set'>
+  readonly notificationSettings: Pick<SettingsScope<DesktopNotificationSettings>, 'getSnapshot' | 'subscribe' | 'set'>
+  /** Hosts can omit unsupported features while sharing the existing page. */
+  readonly capabilities?: {
+    readonly windowModes?: boolean
+    readonly featuresReadOnly?: boolean
+    readonly markets?: readonly DesktopMarketProvider[]
+    readonly materialRequiresRestart?: boolean
+    readonly nativeLanConfirmation?: boolean
+  }
+  readonly extraSections?: ReactNode
 }
 
 /** Renderer-composed props for the official settings section entry. */
@@ -150,7 +159,7 @@ export function resolveDesktopLanConfirmation(
   if (confirmed) enableLan()
 }
 
-function useScope<T>(scope: SettingsScope<T>) {
+function useScope<T>(scope: Pick<SettingsScope<T>, 'getSnapshot' | 'subscribe'>) {
   const subscribe = useCallback((listener: () => void) => scope.subscribe(listener), [scope])
   const snapshot = useCallback(() => scope.getSnapshot(), [scope])
   return useSyncExternalStore(subscribe, snapshot)
@@ -224,7 +233,7 @@ function RepositoryLink({ href, children }: { href: string; children: ReactNode 
   )
 }
 
-function ToggleRow({
+export function DesktopSettingsToggleRow({
   label,
   badge,
   checked,
@@ -308,7 +317,9 @@ export function DesktopSettingsSection({
   setMode: persistMode,
   desktopSettings,
   notificationSettings,
-}: DesktopSettingsSectionProps) {
+  capabilities,
+  extraSections,
+}: DesktopSettingsSectionInjected & Pick<PropsLocale<'desktop.settings'>, 't'>) {
   const desktop = useScope(desktopSettings)
   const notifications = useScope(notificationSettings)
   const [view, setView] = useState<DesktopSettingsView>()
@@ -401,6 +412,7 @@ export function DesktopSettingsSection({
     void run('select-profile', async () => {
       const response = await api.selectProfile(name)
       if (response.restartRequired) requestRestart()
+      else setView(await refreshView())
     })
   }
 
@@ -422,6 +434,7 @@ export function DesktopSettingsSection({
         })
         setAaStatus('saved')
         if (response.restartRequired) requestRestart()
+        else setView(await refreshView())
       } catch (cause) {
         setAaStatus('failed')
         throw cause
@@ -437,7 +450,14 @@ export function DesktopSettingsSection({
         market: { requested: provider, effective: current.market.effective, legacyDefaulted: false },
       })
       if (response.restartRequired) requestRestart()
+      else setView(await refreshView())
     })
+  }
+
+  const openBrowser = (event: React.MouseEvent<HTMLAnchorElement>, url: string): void => {
+    if (!api.openBrowser) return
+    event.preventDefault()
+    void run('web', () => api.openBrowser!(url))
   }
 
   const setMode = (next: DesktopShellSettings['mode']): void => {
@@ -460,7 +480,7 @@ export function DesktopSettingsSection({
         }
         await desktopSettings.set('windowsMaterial', next)
       }
-      requestRestart()
+      if (capabilities?.materialRequiresRestart !== false) requestRestart()
     })
   }
 
@@ -603,7 +623,7 @@ export function DesktopSettingsSection({
         )}
         {view !== undefined && (
           <div className="dshDesktopSettingsList" role="radiogroup" aria-labelledby="dsh-desktop-market-title">
-            {MARKET_OPTIONS.map(option => (
+            {MARKET_OPTIONS.filter(option => capabilities?.markets === undefined || capabilities.markets.includes(option.id)).map(option => (
               <Choice
                 key={option.id}
                 title={marketTitle(option, t)}
@@ -611,7 +631,7 @@ export function DesktopSettingsSection({
                 body={marketBody(option, t)}
                 selected={view.market.requested === option.id}
                 reselectable={view.market.requested === option.id && view.market.requested !== view.market.effective}
-                disabled={busy !== undefined || restart !== 'none'}
+                disabled={capabilities?.featuresReadOnly === true || busy !== undefined || restart !== 'none'}
                 action={() => { selectMarket(option.id) }}
                 status={view.market.requested === option.id && view.market.requested !== view.market.effective
                     ? t('retryMarket')
@@ -643,7 +663,7 @@ export function DesktopSettingsSection({
             body={t(enabled ? 'aaEnabledBody' : 'aaDisabledBody')}
             selected={(view.aa?.requested ?? false) === enabled}
             reselectable={enabled && view.aa?.requested === true && !view.aa.effective}
-            disabled={busy !== undefined || restart !== 'none'}
+            disabled={capabilities?.featuresReadOnly === true || busy !== undefined || restart !== 'none'}
             action={() => { selectAa(enabled) }}
             status={enabled && view.aa?.requested === true && !view.aa.effective
               ? t('retryAa') : (view.aa?.requested ?? false) === enabled ? t('selected') : undefined}
@@ -657,7 +677,7 @@ export function DesktopSettingsSection({
           <p className="dshDesktopSettingsGroupIntro">{t('presentationIntro')}</p>
         </div>
         {desktop.status === 'unavailable' && <p className="dshDesktopSettingsNotice">{t('readOnly')}</p>}
-        <div className="dshDesktopSettingsList" role="radiogroup" aria-labelledby="dsh-desktop-presentation-title">
+        {capabilities?.windowModes !== false && <div className="dshDesktopSettingsList" role="radiogroup" aria-labelledby="dsh-desktop-presentation-title">
           <Choice
             title={t('compatibilityMode')}
             body={t('compatibilityModeBody')}
@@ -682,7 +702,7 @@ export function DesktopSettingsSection({
             action={() => { setMode('advanced') }}
             status={mode === 'advanced' ? t('selected') : undefined}
           />
-        </div>
+        </div>}
         {platform !== 'linux' && (
           <label className="dshDesktopSettingsMaterialField">
             <span className="dshDesktopSettingsMaterialCopy">
@@ -718,20 +738,21 @@ export function DesktopSettingsSection({
           <h3 id="dsh-desktop-web-title">{t('webTitle')}</h3>
           <p className="dshDesktopSettingsGroupIntro">{t('webIntro')}</p>
         </div>
-        <ToggleRow
+        <DesktopSettingsToggleRow
           label={t('openBrowser')}
           checked={browserAccess}
           disabled={!desktopBrowserAccessAvailable(mode) || !settingsWritable || busy !== undefined}
           onChange={setBrowserAccess}
         />
         <p className="dshDesktopSettingsNotice">{t('browserCompatibilityNotice')}</p>
-        <ToggleRow
+        <DesktopSettingsToggleRow
           label={t('lanAccess')}
           badge={t('beta')}
           checked={networkExposure === 'lan'}
           disabled={!browserAccess || !settingsWritable || busy !== undefined}
           onChange={(checked) => {
-            if (checked) setConfirmLan(true)
+            if (checked && capabilities?.nativeLanConfirmation !== true) setConfirmLan(true)
+            else if (checked) setNetworkExposure('lan')
             else setNetworkExposure('loopback')
           }}
         />
@@ -751,9 +772,9 @@ export function DesktopSettingsSection({
         {desktopBrowserUrlsShouldRender(browserAccess, networkExposure) && view !== undefined && (
           <div className="dshDesktopSettingsUrls">
             <span className="dshDesktopSettingsChoiceTitle">{t('browserUrls')}</span>
-            <a href={view.web.localUrl} target="_blank" rel="noopener noreferrer">{view.web.localUrl}</a>
+            <a href={view.web.localUrl} onClick={event => openBrowser(event, view.web.localUrl)} target="_blank" rel="noopener noreferrer">{view.web.localUrl}</a>
             {view.web.lanUrls.length > 0 && <span className="dshDesktopSettingsChoiceTitle">{t('lanHttpsUrls')}</span>}
-            {view.web.lanUrls.map(url => <a href={url} key={url} target="_blank" rel="noopener noreferrer">{url}</a>)}
+            {view.web.lanUrls.map(url => <a href={url} onClick={event => openBrowser(event, url)} key={url} target="_blank" rel="noopener noreferrer">{url}</a>)}
           </div>
         )}
         {networkExposure === 'lan' && view !== undefined && (
@@ -781,32 +802,32 @@ export function DesktopSettingsSection({
           <p className="dshDesktopSettingsGroupIntro">{t('notificationsIntro')}</p>
         </div>
         {notifications.status === 'unavailable' && <p className="dshDesktopSettingsNotice">{t('readOnly')}</p>}
-        <ToggleRow
+        <DesktopSettingsToggleRow
           label={t('notificationsEnabled')}
           checked={notificationValue.enabled}
           disabled={!notificationsWritable || busy !== undefined}
           onChange={checked => { setNotification('enabled', checked) }}
         />
         <div className="dshDesktopSettingsDetails">
-          <ToggleRow
+          <DesktopSettingsToggleRow
             label={t('turnCompletion')}
             checked={notificationValue.notifyOnTurnCompletion}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnTurnCompletion', checked) }}
           />
-          <ToggleRow
+          <DesktopSettingsToggleRow
             label={t('turnFailure')}
             checked={notificationValue.notifyOnTurnFailure}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnTurnFailure', checked) }}
           />
-          <ToggleRow
+          <DesktopSettingsToggleRow
             label={t('jobCompletion')}
             checked={notificationValue.notifyOnJobCompletion}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnJobCompletion', checked) }}
           />
-          <ToggleRow
+          <DesktopSettingsToggleRow
             label={t('jobFailure')}
             checked={notificationValue.notifyOnJobFailure}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
@@ -814,6 +835,7 @@ export function DesktopSettingsSection({
           />
         </div>
       </section>
+      {extraSections}
       {confirmLan && (
         <div className="dshDesktopSettingsDialogBackdrop" role="presentation">
           <div className="dshDesktopSettingsDialog" role="alertdialog" aria-modal="true" aria-labelledby="dsh-desktop-lan-warning-title" aria-describedby="dsh-desktop-lan-warning-body">

@@ -1,7 +1,7 @@
 /** Official alpha.2 Desktop transport with a Host-independent native shell. */
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, Notification, protocol, safeStorage, session, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
@@ -19,7 +19,7 @@ import { desktopLanAddresses } from './lan-addresses.ts'
 import { createLanHttpsCertificate } from './lan-https-certificate.ts'
 import { desktopTerminalStateDirectory, openDesktopTerminal } from './desktop-terminal.ts'
 import { bundledPnpmEntry } from './extensions.ts'
-import { DESKTOP_CONTROLS_CSS } from './controls/styles.ts'
+import { auxiliaryWindowChromeOptions, auxiliaryWindowHasCustomFrame } from '../../dsh-plugin-desktop-beta/src/auxiliary-window-options.ts'
 import { privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
 import { RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
@@ -82,6 +82,7 @@ function show(window: BrowserWindow): void {
 function createWindow(preload: string, primary = false): BrowserWindow {
   const window = new BrowserWindow({ width: 1280, height: 840, minWidth: 800, minHeight: 580,
     show: false, title: 'DSH Desktop Next',
+    ...(!primary ? auxiliaryWindowChromeOptions() : {}),
     ...(process.platform === 'win32' && primary ? {
       titleBarStyle: 'hidden' as const,
       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: nativeTheme.shouldUseDarkColors ? '#1b1b1c' : '#f9fafb',
@@ -118,13 +119,20 @@ function createWindow(preload: string, primary = false): BrowserWindow {
 
 function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' = 'general'): void {
   if (quitting) return
-  const url = `${SHELL_URL}?lang=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}#${page}`
+  const url = `${SHELL_URL}?locale=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}&platform=${process.platform}&frame=${auxiliaryWindowHasCustomFrame()}#${page}`
+  const resize = (window: BrowserWindow): void => {
+    const creating = page === 'create-profile'
+    window.setResizable(!creating)
+    window.setMinimumSize(creating ? 420 : 680, creating ? 330 : 560)
+    window.setSize(creating ? 480 : 850, creating ? 360 : 800)
+  }
   if (shellWindow && !shellWindow.isDestroyed()) {
+    resize(shellWindow)
     void shellWindow.loadURL(url).catch(error => runtime.diagnostics.append(String(error), 'error'))
     show(shellWindow); return
   }
   shellWindow = createWindow('preload-shell.cjs')
-  shellWindow.setSize(850, 800)
+  resize(shellWindow)
   shellWindow.on('closed', () => { shellWindow = undefined })
   void shellWindow.loadURL(url).catch(error => runtime.diagnostics.append(String(error), 'error'))
 }
@@ -157,6 +165,7 @@ async function command(value: unknown): Promise<void> {
     if (input.page !== undefined && (typeof input.page !== 'string' || !['general', 'profiles', 'create-profile', 'tools', 'recovery'].includes(input.page))) throw new Error('Invalid controls page')
     openControls(input.page as Parameters<typeof openControls>[0]); return
   }
+  if (type === 'close-controls') { shellWindow?.close(); return }
   if (type === 'quit') { app.quit(); return }
   if (runtime.busy || quitting) throw new Error(t('另一项操作正在进行，请稍候。', 'Another operation is in progress.'))
   runtime.busy = true; native.refresh()
@@ -192,7 +201,7 @@ async function command(value: unknown): Promise<void> {
     if (type === 'open-profile') { await openPath(runtime.profiles.directory(runtime.selected)); return }
     if (type === 'open-logs') { runtime.diagnostics.flush(); await openPath(dirname(runtime.diagnostics.file)); return }
     if (type === 'open-backups') { privateDirectory(runtime.recovery.directory); await openPath(runtime.recovery.directory); return }
-    if (type === 'open-browser') { await shell.openExternal(runtime.browserLink()); return }
+    if (type === 'open-browser' || type === 'open-lan') { await shell.openExternal(runtime.browserLink(type === 'open-lan')); return }
     if (type === 'copy-browser' || type === 'copy-lan') { clipboard.writeText(runtime.browserLink(type === 'copy-lan')); return }
     if (type === 'export-ca' || type === 'diagnostics') {
       const certificate = runtime.lan?.caCertificate
@@ -259,12 +268,9 @@ async function main(): Promise<void> {
   protocol.handle('dsh-app', async request => {
     const url = new URL(request.url)
     if (url.hostname === 'shell') {
-      if (url.pathname === '/shell.css' && request.method === 'GET') return new Response(DESKTOP_CONTROLS_CSS, { headers: { 'content-type': 'text/css; charset=utf-8' } })
-      const file = new Map([['/index.html', 'renderer/index.html'], ['/shell.js', 'lib/shell.js']]).get(url.pathname)
-      if (!file || request.method !== 'GET') return new Response(null, { status: 404 })
-      const type = file.endsWith('.html') ? 'text/html' : file.endsWith('.js') ? 'text/javascript' : 'text/css'
-      return new Response(await readFile(join(root, file)), { headers: { 'content-type': `${type}; charset=utf-8`,
-        'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'" } })
+      const response = await serveWebDocument(request, join(root, 'lib/native-ui'), false)
+      response.headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; frame-src 'none'; base-uri 'none'")
+      return response
     }
     if (url.hostname !== 'app') return new Response(null, { status: 404 })
     if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname.startsWith('/assets/')
