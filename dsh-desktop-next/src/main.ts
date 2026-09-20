@@ -41,6 +41,7 @@ let sidebarBrowser: NativeSidebarBrowser | undefined
 let shellWindow: BrowserWindow | undefined
 let pendingSettings: DesktopSettingsPage | undefined
 let quitting = false
+let onboarding = false
 let relaunch: string[] | undefined
 let ownsInstance = false
 let windowsLanguage = 'en'
@@ -75,7 +76,7 @@ const native = new NativeDesktop({ root, language: () => windowsLanguage, state,
 const permissions = createNativePermissions()
 
 function state(): DesktopState {
-  return { ...runtime.state(), platform: process.platform, version,
+  return { ...runtime.state(), onboarding, platform: process.platform, version,
     trayAvailable: native.available, notificationsAvailable: Notification.isSupported(), windowsMicaSupported: process.platform === 'win32' && supportsMica() }
 }
 function run(value: DesktopCommand): void { void command(value).catch(error => runtime.report(error)) }
@@ -135,13 +136,14 @@ function createWindow(preload: string, primary = false): BrowserWindow {
 
 function openSettings(page: DesktopSettingsPage = 'general'): void {
   if (quitting) return
+  if (onboarding) { openControls('onboarding'); return }
   if (runtime.recoveryMode || runtime.state().phase === 'error') { openControls('recovery'); return }
   pendingSettings = page
   openMain()
   mainWindow?.webContents.send(IPC.settingsOpen)
 }
 
-function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' = 'general'): void {
+function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' | 'recovery' | 'permissions' | 'onboarding' = 'general'): void {
   if (quitting) return
   if (page === 'general' || page === 'tools' || page === 'permissions') { openSettings(page === 'permissions' ? 'permissions' : 'general'); return }
   const url = `${SHELL_URL}?locale=${windowsLanguage.toLowerCase().startsWith('zh') ? 'zh' : 'en'}&platform=${process.platform}&frame=${auxiliaryWindowHasCustomFrame()}#${page}`
@@ -149,9 +151,11 @@ function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' 
     const creating = page === 'create-profile'
     window.setResizable(!creating)
     window.setMinimumSize(creating ? 420 : 680, creating ? 330 : 560)
-    window.setSize(creating ? 480 : 850, creating ? 360 : 800)
+    window.setSize(creating ? 480 : page === 'onboarding' ? 1040 : 850, creating ? 360 : page === 'onboarding' ? 720 : 800)
   }
   if (shellWindow && !shellWindow.isDestroyed()) {
+    // Dock/tray activation must not reset an unfinished wizard or its selections.
+    if (page === 'onboarding' && shellWindow.webContents.getURL() === url) { show(shellWindow); return }
     resize(shellWindow)
     void shellWindow.loadURL(url).catch(error => runtime.diagnostics.append(String(error), 'error'))
     show(shellWindow); return
@@ -164,6 +168,7 @@ function openControls(page: 'general' | 'profiles' | 'create-profile' | 'tools' 
 function openMain(): void {
   if (quitting) return
   if (runtime.recoveryMode) { openControls('recovery'); return }
+  if (onboarding) { openControls('onboarding'); return }
   if (mainWindow && !mainWindow.isDestroyed()) { show(mainWindow); return }
   mainWindow = createWindow('preload-app.cjs', true)
   const owner = mainWindow
@@ -204,6 +209,17 @@ async function command(value: unknown): Promise<void> {
   if (runtime.busy || quitting) throw new Error(t('另一项操作正在进行，请稍候。', 'Another operation is in progress.'))
   runtime.busy = true; native.refresh()
   try {
+    if (type === 'onboarding-complete' || type === 'onboarding-skip') {
+      if (!onboarding || runtime.safeMode || runtime.recoveryMode || input.profile !== runtime.selected) throw new Error('Onboarding is unavailable for this Profile')
+      // The Host has not loaded this Profile yet. Commit choices before starting it.
+      runtime.profiles.finishOnboarding(runtime.selected, type === 'onboarding-complete' ? parseFeatures(input.features) : undefined)
+      onboarding = false
+      shellWindow?.hide()
+      void runtime.start().catch(() => {})
+      openMain()
+      shellWindow?.close()
+      return
+    }
     if (type === 'restart-app' || type === 'restart-recovery') {
       if (!await confirmed(type === 'restart-recovery'
         ? t('重启应用并进入恢复模式？', 'Restart the application in recovery mode?')
@@ -221,8 +237,11 @@ async function command(value: unknown): Promise<void> {
       if (await confirmed(t(`移除 Profile「${name}」？`, `Remove Profile “${name}”?`), t('其文件将移入恢复备份目录。共享的会话和设置会保留。', 'Its files move to recovery backups. Shared sessions and settings are retained.'))) runtime.recovery.removeProfile(name, runtime.selected)
       return
     }
-    if (type === 'reload') { if (runtime.recoveryMode) return; openMain(); await mainWindow!.loadURL(APP_URL); return }
-    if (type === 'devtools') { openMain(); (runtime.recoveryMode ? shellWindow : mainWindow)!.webContents.toggleDevTools(); return }
+    if (type === 'reload') {
+      if (runtime.recoveryMode || onboarding) { openMain(); return }
+      openMain(); await mainWindow!.loadURL(APP_URL); return
+    }
+    if (type === 'devtools') { openMain(); (runtime.recoveryMode || onboarding ? shellWindow : mainWindow)!.webContents.toggleDevTools(); return }
     if (type === 'terminal') {
       const profileDir = runtime.profiles.directory(runtime.selected)
       openDesktopTerminal({ platform: process.platform, appExecutable: process.execPath, dshBootstrapPath: join(root, 'lib', 'desktop-cli.js'),
@@ -277,6 +296,7 @@ async function command(value: unknown): Promise<void> {
     const features = type === 'features' ? parseFeatures(input.features) : undefined
     if (type === 'rollback' && !runtime.recovery.latest(next)) throw new Error(t('尚无成功启动的配置备份。', 'No successful-start configuration is available.'))
     const messages: Record<string, string> = {
+      switch: t(`切换到 Profile「${next}」并重启应用？`, `Switch to Profile “${next}” and restart the application?`),
       recover: t('备份并修复当前 Profile？将禁用第三方插件、远控和市场。', 'Back up and repair this Profile? Third-party plugins, remote control and Market will be disabled.'),
       'repair-global': t('备份并停用全局补丁？这会影响所有 Next Profile。', 'Back up and disable the global patch? This affects every Next Profile.'),
       rollback: t('恢复最近成功启动的 Profile 配置？当前配置会先备份。', 'Restore the last successful-start Profile configuration? The current configuration will be backed up first.'),
@@ -284,6 +304,14 @@ async function command(value: unknown): Promise<void> {
       'normal-mode': t('退出安全模式，重新启动原 Profile？', 'Leave safe mode and restart the original Profile?'),
     }
     if (!await confirmed(messages[String(type)] ?? t('重启工作环境以应用更改？', 'Restart the environment to apply this change?'))) return
+    if (type === 'switch') {
+      runtime.profiles.select(next)
+      relaunch = relaunchArguments(process.argv.slice(1), false, false)
+      app.quit()
+      return
+    }
+    // Recovery actions can always bypass first-run setup to repair or inspect a Profile.
+    onboarding = false
     await runtime.restart(async () => {
       if (type === 'recover') await runtime.profiles.recover(next)
       if (type === 'rollback') await runtime.recovery.restore(next)
@@ -291,12 +319,12 @@ async function command(value: unknown): Promise<void> {
       if (features) runtime.profiles.setFeatures(next, features)
       if (type === 'safe-mode') runtime.safeMode = true
       else if (type !== 'restart') runtime.safeMode = false
-      if (type === 'switch') { runtime.profiles.select(next); runtime.selected = next }
     })
     openMain()
     await mainWindow!.loadURL(APP_URL)
   } catch (error) {
-    runtime.report(error)
+    if (onboarding && (type === 'onboarding-complete' || type === 'onboarding-skip')) runtime.diagnostics.append(String(error), 'error')
+    else runtime.report(error)
     throw error
   } finally { runtime.busy = false; native.refresh() }
 }
@@ -400,6 +428,15 @@ async function main(): Promise<void> {
   runtime.safeMode = process.argv.includes(SAFE_ARGUMENT)
   runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
   runtime.initialize()
+  if (!runtime.safeMode && !runtime.recoveryMode) {
+    try {
+      runtime.profiles.ensure(runtime.selected)
+      onboarding = runtime.profiles.onboardingRequired(runtime.selected)
+    } catch (error) {
+      runtime.recoveryMode = true
+      runtime.report(error)
+    }
+  }
   native.createTray()
   Menu.setApplicationMenu(process.platform === 'win32' ? null : Menu.buildFromTemplate([
     { label: 'DSH Desktop Next', submenu: native.items() }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
@@ -435,6 +472,7 @@ async function main(): Promise<void> {
     })
   }
   if (runtime.recoveryMode) openControls('recovery')
+  else if (onboarding) openControls('onboarding')
   else { void runtime.start().catch(() => {}); openMain() }
   app.on('activate', openMain)
   app.on('window-all-closed', () => { if (process.platform !== 'darwin' && !native.available) app.quit() })

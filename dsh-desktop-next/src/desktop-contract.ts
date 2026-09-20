@@ -44,6 +44,8 @@ export interface DesktopState {
   busy: boolean
   failure: string
   safeMode: boolean
+  /** The selected Profile is awaiting its first-run choices; no Host has started. */
+  onboarding?: boolean
   home: string
   platform: string
   version: string
@@ -63,6 +65,8 @@ export interface DesktopBrowserLinks {
 }
 
 export type DesktopCommand =
+  | { type: 'onboarding-complete'; profile: string; features: Features }
+  | { type: 'onboarding-skip'; profile: string }
   | { type: 'open-browser-url' | 'copy-browser-url'; url: string }
   | { type: 'create' | 'switch' | 'delete'; name: string }
   | { type: 'features'; features: Features }
