@@ -4,8 +4,8 @@
     {
       "layers" : [
         {
-          "image-name" : "NEXT Badge.svg",
-          "name" : "NEXT Badge",
+          "image-name" : "BETA Badge.svg",
+          "name" : "BETA Badge",
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
@@ -15,7 +15,7 @@
           }
         }
       ],
-      "name" : "NEXT Badge",
+      "name" : "BETA Badge",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5

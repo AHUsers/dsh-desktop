@@ -1,0 +1,26 @@
+{
+  "logo": {
+    "source": "https://github.com/deepseek-ai/DeepSeek-LLM/blob/f8b3d77beb4449d77932eccc6abe08826ad3c608/images/logo.svg",
+    "modifications": "Whale path extracted without the wordmark; white fill and desktop icon placement."
+  },
+  "artwork": {
+    "next": "dsh-desktop-next/assets/DSHDesktopNext.icon",
+    "beta": "dsh-plugin-desktop-beta/build/DSHDesktopBeta.icon",
+    "background": "system-dark",
+    "badge": "Same capsule, placement and effects for both variants; system heavy text with identical size and tracking, converted to SVG outlines."
+  },
+  "previews": {
+    "next": "dsh-desktop-next/assets/app-icon-mac.png",
+    "beta": "dsh-plugin-desktop-beta/build/DSHDesktopBeta.png",
+    "tool": "Icon Composer ictool",
+    "arguments": [
+      "--export-image",
+      "--platform", "macOS",
+      "--rendition", "Default",
+      "--width", "1024",
+      "--height", "1024",
+      "--scale", "1",
+      "--design-generation", "27"
+    ]
+  }
+}
