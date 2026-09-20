@@ -83,7 +83,6 @@ export async function forwardWebRequest(request: Request, host: string, cookie: 
   if (source.protocol !== 'dsh-app:' || source.host !== 'app' || source.username || source.password
     || !nativeToken || request.headers.get(NATIVE_ACCESS_HEADER) !== nativeToken) return new Response(null, { status: 403 })
   if (origin !== null && origin !== 'dsh-app://app') return new Response(null, { status: 403 })
-  const market = source.pathname.startsWith('/api/community-market/')
   const target = new URL(host)
   target.pathname = source.pathname
   target.search = source.search
@@ -91,12 +90,11 @@ export async function forwardWebRequest(request: Request, host: string, cookie: 
   for (const name of ['host', 'origin', 'cookie', 'sec-fetch-site', NATIVE_ACCESS_HEADER]) headers.delete(name)
   headers.set('cookie', cookie)
   headers.set(NATIVE_ACCESS_HEADER, nativeToken)
-  // Market retains its own same-origin mutation gate. Only translate after
-  // validating the application origin; never trust a caller-supplied Host.
-  if (market) {
-    headers.set('origin', target.origin)
-    headers.set('sec-fetch-site', 'same-origin')
-  }
+  // Preserve same-origin semantics for every owned plugin route, including
+  // /dsh-market/*. Translate only after validating the native frame marker and
+  // source origin; the HTTP client supplies Host from this owned target URL.
+  headers.set('origin', target.origin)
+  headers.set('sec-fetch-site', 'same-origin')
   const init = { method: request.method, headers, body: request.body, signal: request.signal, duplex: 'half', redirect: 'manual' as const }
   const response = await fetch(target, init)
   const outgoing = new Headers(response.headers)

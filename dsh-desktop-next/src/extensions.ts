@@ -1,12 +1,13 @@
-/** Narrow Host capabilities consumed by the existing Community Market. */
+/** Narrow Host capabilities consumed by the existing plugin markets. */
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import { readProfilePlugins, type ProfilePnpmInvocation } from '@deepseek-ai/dsh-app-boot'
+import { composeEntries, loadOverlayPatches, readProfilePlugins, resolveBundleDir, type ProfilePnpmInvocation } from '@deepseek-ai/dsh-app-boot'
 import { installNotifications } from './notifications.ts'
 import { HostPermissions } from './host-permissions.ts'
+import { NEXT_PACKAGE, profileName } from './profiles.ts'
 
 export const name = 'desktop-next-capabilities'
 export const inject = ['profileContext']
@@ -32,8 +33,13 @@ export function apply(ctx: Context): void {
       .dependencies.filter(item => item.bundle).map(item => {
         const mutable = item.name !== shipped.name && !Object.hasOwn(shipped.dependencies, item.name)
           && !item.name.startsWith('@deepseek-ai/')
+        const dir = resolveBundleDir('dsh-desktop-next', item.name, profile.installAnchor, profile.dir)
+        const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { dsh: { bundle: { patch: string } } }
+        const rows = composeEntries([loadOverlayPatches('dsh-desktop-next', join(dir, manifest.dsh.bundle.patch))])
+        const active = rows.length === 0 || [...ctx.loader.entries()].some(entry =>
+          rows.some(row => row.id === entry.options.id) && !entry.disabled && entry.fiber?.state === 2 /* FiberState.ACTIVE */)
         return { bundleId: item.name, packageName: item.name, mutable, uninstallable: mutable,
-          status: item.enabled && profile.startedBundles.includes(item.name) ? 'active' : 'disabled' }
+          status: item.enabled && active ? 'active' : 'disabled' }
       }),
   })
   if (process.send) ctx.provide('desktopActions', {
@@ -53,46 +59,57 @@ export function apply(ctx: Context): void {
 export function createPackageRunner(invocation: ProfilePnpmInvocation, directory: string) {
   let active: { cancel(): void; done: Promise<unknown> } | undefined
   let disposed = false
+  function start(args: readonly string[], cwd: string, signal?: AbortSignal, env: NodeJS.ProcessEnv = {}) {
+    if (disposed) throw new Error('Package runner has been disposed')
+    if (active) throw new Error('A profile package operation is already active')
+    if (signal?.aborted) throw signal.reason ?? new Error('Package operation cancelled')
+    if (!args.length || args.some(arg => typeof arg !== 'string' || arg.includes('\0'))) throw new Error('Invalid package arguments')
+    if (!isAbsolute(cwd) || cwd.includes('\0')) throw new Error('Package invoking directory must be absolute')
+    const child = spawn(invocation.command, [...args], {
+      cwd, env: { ...process.env, ...invocation.env, ...env },
+      windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let settled = false
+    let killTimer: NodeJS.Timeout | undefined
+    const kill = (kind: NodeJS.Signals): void => {
+      if (settled || !child.pid) return
+      if (process.platform === 'win32') {
+        const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
+        killer.on('error', () => { if (!settled) child.kill(kind) })
+      } else {
+        try { process.kill(-child.pid, kind) } catch { child.kill(kind) }
+      }
+    }
+    const cancel = (): void => {
+      if (settled || killTimer) return
+      kill('SIGTERM')
+      killTimer = setTimeout(() => kill('SIGKILL'), 2_000)
+      killTimer.unref()
+    }
+    const done = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+      child.once('error', reject)
+      child.once('close', (exitCode, exitSignal) => { resolve({ exitCode, signal: exitSignal }) })
+    }).finally(() => {
+      settled = true
+      clearTimeout(killTimer)
+      signal?.removeEventListener('abort', cancel)
+      if (active?.done === done) active = undefined
+    })
+    active = { cancel, done }
+    void done.catch(() => {})
+    signal?.addEventListener('abort', cancel, { once: true })
+    return { stdout: child.stdout!, stderr: child.stderr!, done, cancel }
+  }
   return {
     run(argv: readonly string[], signal?: AbortSignal) {
-      if (disposed) throw new Error('Package runner has been disposed')
-      if (active) throw new Error('A profile package operation is already active')
-      if (signal?.aborted) throw signal.reason ?? new Error('Package operation cancelled')
-      if (!argv.length || argv.some(arg => typeof arg !== 'string' || arg.includes('\0'))) throw new Error('Invalid pnpm arguments')
-      const child = spawn(invocation.command, [...invocation.args, ...argv, '--config.minimumReleaseAge=0'], {
-        cwd: directory, env: { ...process.env, ...invocation.env },
-        windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
-      })
-      let settled = false
-      let killTimer: NodeJS.Timeout | undefined
-      const kill = (kind: NodeJS.Signals): void => {
-        if (settled || !child.pid) return
-        if (process.platform === 'win32') {
-          const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
-          killer.on('error', () => { if (!settled) child.kill(kind) })
-        } else {
-          try { process.kill(-child.pid, kind) } catch { child.kill(kind) }
-        }
-      }
-      const cancel = (): void => {
-        if (settled || killTimer) return
-        kill('SIGTERM')
-        killTimer = setTimeout(() => kill('SIGKILL'), 2_000)
-        killTimer.unref()
-      }
-      const done = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-        child.once('error', reject)
-        child.once('close', (exitCode, exitSignal) => { resolve({ exitCode, signal: exitSignal }) })
-      }).finally(() => {
-        settled = true
-        clearTimeout(killTimer)
-        signal?.removeEventListener('abort', cancel)
-        if (active?.done === done) active = undefined
-      })
-      active = { cancel, done }
-      void done.catch(() => {})
-      signal?.addEventListener('abort', cancel, { once: true })
-      return { stdout: child.stdout!, stderr: child.stderr!, done, cancel }
+      if (!argv.length) throw new Error('Invalid pnpm arguments')
+      return start([...invocation.args, ...argv, '--config.minimumReleaseAge=0'], directory, signal)
+    },
+    /** dshmarket uses the official CLI so installs/removals also reconcile Profile bundles. */
+    runPlugin(argv: readonly string[], invokingDir: string, signal?: AbortSignal) {
+      if (!argv.length) throw new Error('Invalid plugin arguments')
+      return start(['--expose-internals', join(dirname(NEXT_PACKAGE), 'lib', 'plugin-cli.js'),
+        profileName(basename(directory)), ...argv], invokingDir, signal, { DSH_HOME: dirname(dirname(directory)) })
     },
     async dispose(): Promise<void> {
       disposed = true

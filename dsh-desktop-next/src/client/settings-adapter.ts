@@ -73,14 +73,6 @@ export class NextSettingsAdapter {
     if (!key) return Promise.reject(new Error('Unsupported Desktop preference'))
     return this.savePreferences({ [key]: value })
   }
-  private async selectFeatures(patch: Partial<DesktopState['features']>): Promise<{ accepted: true; restartRequired: false }> {
-    await this.enqueue(async () => {
-      const state = await this.refresh()
-      if (state.safeMode) throw new Error('Features are unavailable in safe mode')
-      try { await this.bridge.command({ type: 'features', features: { ...state.features, ...patch } }) } finally { await this.settle() }
-    })
-    return { accepted: true, restartRequired: false }
-  }
   private async readSettings(): Promise<DesktopSettingsView> {
     const state = await this.refresh()
     return projectSettings(state, await this.bridge.browserLinks())
@@ -90,8 +82,7 @@ export class NextSettingsAdapter {
     createProfile: async name => { await this.command({ type: 'create', name }); return this.readSettings() },
     deleteProfile: async name => { await this.command({ type: 'delete', name }); return this.readSettings() },
     selectProfile: async name => { await this.command({ type: 'switch', name }); return { accepted: true, restartRequired: false } },
-    selectAa: enabled => this.selectFeatures({ remoteControl: enabled }),
-    selectMarket: provider => provider === 'dsh-market' ? Promise.reject(new Error('Market is unavailable')) : this.selectFeatures({ market: provider === 'community-market' }),
+    selectMarket: async () => { throw new Error('Manage markets in the Plugins page') },
     openBrowser: url => this.command({ type: 'open-browser-url', url }),
     copyBrowser: url => this.command({ type: 'copy-browser-url', url }),
     openTerminal: () => this.command({ type: 'terminal' }),

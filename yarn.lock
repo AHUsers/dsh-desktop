@@ -5122,6 +5122,38 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-plugin-manager@patch:@deepseek-ai/dsh-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz#./patches/dsh-plugin-manager@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-plugin-manager@patch:@deepseek-ai/dsh-plugin-manager@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-plugin-manager-0.1.6-alpha.2.tgz%3A%3Ahash=95dd1b&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-plugin-manager@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=21f625&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    "@deepseek-ai/dsh-app-boot": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/dsh-atomic-write": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/dsh-util-values": "npm:^0.1.6-alpha.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.2"
+    execa: "npm:^10.0.0"
+    yaml: "npm:^2.9.0"
+    zod: "npm:^4.4.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+    "@deepseek-ai/cordis-plugin-loader": ^1.0.3
+    "@deepseek-ai/dsh-brand": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-hmr": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-host-plugin-inventory": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-sandbox": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-sandbox-policy": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-subprocess": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-tools": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-typert-protocol": ^0.1.6-alpha.2
+    "@deepseek-ai/dsh-user-approval": ^0.1.6-alpha.2
+  peerDependenciesMeta:
+    "@deepseek-ai/dsh-hmr":
+      optional: true
+    "@deepseek-ai/dsh-user-approval":
+      optional: true
+  checksum: 10c0/f0550ce0d10c7ee6cc73c2ea5807f349d58f1176c0c67240380d027c47f1329860c4527138ea5a524b0ca9d8c44d4b4b1ea7db147c5f4622de68299cfac5423f
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-plugin-package-inventory-deepseek@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-plugin-package-inventory-deepseek-0.1.5-rc.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.5-rc.2
   resolution: "@deepseek-ai/dsh-plugin-package-inventory-deepseek@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-plugin-package-inventory-deepseek-0.1.5-rc.2.tgz#vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-plugin-package-inventory-deepseek-0.1.5-rc.2.tgz::hash=56ba15&locator=deepseek-harness-desktop%40workspace%3A."
@@ -13607,6 +13639,7 @@ __metadata:
     "@deepseek-ai/dsh-permission-presets": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-persona": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-plan-mode": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-plugin-manager": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-ptc-runtime": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-pwsh-local": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-pwsh-sandbox": "npm:0.1.6-alpha.2"
@@ -13679,6 +13712,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     dsh-community-market: "npm:0.1.0-dev.0"
+    dshmarket: "npm:1.38.1"
     electron: "npm:44.0.0"
     lucide-react: "npm:^1.33.0"
     playwright: "npm:1.63.0"

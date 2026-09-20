@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控和社区市场。
+基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
 
 ## 开发与验证
 
@@ -38,14 +38,16 @@ corepack yarn workspace dsh-desktop-next verify:window-controls
 
 ## 使用
 
-在官方主界面中打开 **设置 → 桌面**，或使用托盘的 **桌面设置…**、`CmdOrCtrl+,`。Host 启动失败时，托盘和独立控制窗口仍然可用。切换 Profile、应用功能开关或更改端口，会先停止当前 Host，再启动新 Host，进行中的任务会被中断。浏览器和局域网访问开关即时生效，无需重启。
+在官方主界面中打开 **设置 → 桌面**，或使用托盘的 **桌面设置…**、`CmdOrCtrl+,`。Host 启动失败时，托盘和独立控制窗口仍然可用。切换 Profile 或更改端口，会先停止当前 Host，再启动新 Host，进行中的任务会被中断。浏览器和局域网访问开关即时生效，无需重启。
 
 - **托盘与后台运行：** 沿用原桌面版的常用项顺序：打开主窗口、重新加载界面、打开 DSH 终端、导出诊断、进入／退出安全模式、Profile 选择与新建。另保留桌面设置和恢复助手入口；原生菜单跟随应用内语言。开启后台运行且托盘可用时，关闭主窗口不会停止 Host 和远控连接；明确选择退出才会关闭 HTTPS 入口与 Host。系统托盘不可用时，关闭主窗口会退出应用，避免留下无法重新打开的进程。
 - **桌面设置：** 后台运行、macOS 透明材质、受支持的 Windows Mica、本机和局域网访问、日志级别，以及用户回合完成／失败时的独立通知开关。后台任务不发送通知。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Acrylic 继续停用；Mica 要求 Windows 内部版本不低于 22621。通知还需系统授权，仅在主窗口未聚焦时显示。成功通知以本轮用户消息为标题、AI 最后一条可见回复为正文，过长内容会截断；失败通知显示通用状态，子代理和自动回合不发送通知。
-- **Profile：** 新建、切换、打开目录或移除未使用的 Profile。托盘的新建入口直接聚焦名称，创建后可切换；损坏的清单或缺少 Next bundle 的 Profile 标为不可用，切换当前 Profile 不会重复重启。移除操作将文件移入恢复备份目录，当前 Profile 和默认 Profile 不可移除。Profile 分别保存插件依赖、激活列表、补丁和功能开关；会话、设置和凭据仍按上游规则在同一个 Next home 内共享，不提供账号或数据隔离。
-- **社区市场：** 默认启用，沿用发现、来源管理、安装预览、确认安装和卸载流程。包操作使用随应用提供的 pnpm，完成后可请求重启；macOS 和 Windows 也支持市场中的终端入口。
-- **手机远控：** 默认关闭。启用并重启后，在官方主界面的“手机连接”中完成配置；Connector 状态按 Profile 保存在 Next home。切换 Profile 会停止旧 Host 和其中的远控连接。
+- **Profile：** 新建、切换、打开目录或移除未使用的 Profile。托盘的新建入口直接聚焦名称，创建后可切换；损坏的清单或缺少 Next bundle 的 Profile 标为不可用，切换当前 Profile 不会重复重启。移除操作将文件移入恢复备份目录，当前 Profile 和默认 Profile 不可移除。Profile 分别保存插件依赖、激活列表和补丁；会话、设置和凭据仍按上游规则在同一个 Next home 内共享，不提供账号或数据隔离。
+- **插件市场：** 在官方**插件**页中独立管理 `dsh-community-market`（默认启用）和 `dshmarket`（默认停用），两者可以同时开启。社区市场保留侧边栏入口；dshmarket 保留**设置 → 插件市场**入口。社区市场沿用发现、来源管理、安装预览、确认安装和卸载流程。包操作使用随应用提供的 pnpm，完成后可请求重启；macOS 和 Windows 也支持市场中的终端入口。
+- **手机远控：** 在官方**插件**页启用 `@agents-anywhere/dsh-bridge-next`（默认关闭）后，在官方主界面的“手机连接”中完成配置；Connector 状态按 Profile 保存在 Next home。切换 Profile 会停止旧 Host 和其中的远控连接。
 - **桌面工具：** 打开数据、Profile 和日志目录，刷新界面，打开开发者工具，导出诊断，以及打开 macOS/Windows 终端。终端提供当前安装的 `dsh`、`pnpm` 和基于 Electron 的 `node`；应用处于安全模式时，终端仍选择原 Profile。
+
+这三个内置插件复用官方卡片、bundle 开关和组件开关。它们随 Next 提供，可停用，但不能从应用中卸载。两个市场安装到 Profile 的 bundle 插件会出现在官方管理器中，可继续启用、停用和卸载。dshmarket 自己的插件停用逻辑保持原样。Next 的桌面设置不再显示原来的选择器。旧 `desktop-next.features.json` 中的选择只迁移一次到 `package.json`，以后启动遵循官方管理器的设置；远控连接配置的 Profile 存储路径保持不变。
 
 侧边栏扩展入口复用原桌面的底部布局：多个入口纵向排列在设置上方，数量较多时在限定高度内滚动，保留工作区列表空间。
 
@@ -117,6 +119,7 @@ corepack yarn workspace dsh-desktop-next verify:host --computer-use
               │  上游共享 runProfile
        官方 Web bundles + Next bundle
               ├─ Community Market
+              ├─ dshmarket
               └─ Agents Anywhere bridge
 ```
 
@@ -124,10 +127,10 @@ alpha.1 的无端口管道方案已被 alpha.2 的 WebServer 方案替代。本�
 
 主界面使用官方前端产物，不复制聊天、设置或插件管理页面。macOS 窗口材质、平台标记、Windows 标题栏菜单与主题同步参考官方实现。Next 通过官方的 `settings.section` 槽位添加“桌面”分区，通过 `settings.action` 添加顶部快捷操作。桌面分区直接复用 `dsh-plugin-desktop-beta` 的 `DesktopSettingsSection`、顶部操作和样式；恢复与 Profile 窗口复用原有 React 页面、窗口标题区和基础组件。Next 只适配状态与操作接口，并按能力隐藏未支持的功能，不维护另一套页面副本。共享组件改动同步到 Stable，保留两个版本原有的默认行为。经过发送者校验的窄 IPC 接口只提供预定义的原生操作，普通浏览器不会获得原生 Desktop 接口。
 
-Next 是正式的 Profile bundle，因此上游插件管理器重新组合配置时仍保留附加能力。开发目录启动时，只为 Next 自身在 `home/profiles/node_modules` 建立一个受管链接；其他依赖由 alpha.2 的 runtime resolver 解析。所有上游运行时依赖来自发布包，不链接或改写 `deepseek-harness/` 源码。
+Next 是正式的 Profile bundle，因此上游插件管理器重新组合配置时仍保留附加能力。内置可选插件通过版本限定的 plugin-manager 补丁读取安装清单 `dsh.optionalBundles`，停用后也会保留在官方插件页中，不修改官方页面。dshmarket 的安装接口调用官方 `runPluginCommand`，使用 Next 当前 Profile、安装路径和内置 pnpm，不依赖系统 PATH 中的 pnpm。开发目录启动时，只为 Next 自身在 `home/profiles/node_modules` 建立一个受管链接；其他依赖由 alpha.2 的 runtime resolver 解析。所有上游运行时依赖来自发布包，不链接或改写 `deepseek-harness/` 源码。
 
 [upstream-reference.json](upstream-reference.json) 记录参考提交和复制文件的原始摘要；原始许可保存在 [LICENSE.upstream](LICENSE.upstream)。
 
 ## 当前边界
 
-这是可运行的开发包，尚无签名安装包、自动更新或 Stable/Beta 数据迁移。官方发布包内的 Python/Office 离线运行时和技能包也尚未集成。我们自己的增强／扩展窗口模式继续留待后续迁移。尚不可用的更新渠道、其他市场适配和窗口模式不显示占位操作，也不会安装 Stable/Beta 的安装包。Node/Electron 的无图形检查不代表跨平台安装包和视觉验收完成。
+这是可运行的开发包，尚无签名安装包、自动更新或 Stable/Beta 数据迁移。官方发布包内的 Python/Office 离线运行时和技能包也尚未集成。我们自己的增强／扩展窗口模式继续留待后续迁移。尚不可用的更新渠道和窗口模式不显示占位操作，也不会安装 Stable/Beta 的安装包。Node/Electron 的无图形检查不代表跨平台安装包和视觉验收完成。

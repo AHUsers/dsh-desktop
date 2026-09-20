@@ -47,6 +47,7 @@ export interface DesktopSettingsSectionInjected {
   readonly notificationSettings: Pick<SettingsScope<DesktopNotificationSettings>, 'getSnapshot' | 'subscribe' | 'set'>
   /** Hosts can omit unsupported features while sharing the existing page. */
   readonly capabilities?: {
+    readonly pluginSelectors?: boolean
     readonly windowModes?: boolean
     readonly featuresReadOnly?: boolean
     readonly markets?: readonly DesktopMarketProvider[]
@@ -649,6 +650,7 @@ export function DesktopSettingsSection({
         )}
       </section>
 
+      {capabilities?.pluginSelectors !== false && <>
       <section className="dshDesktopSettingsGroup" aria-labelledby="dsh-desktop-market-title">
         <div>
           <h3 id="dsh-desktop-market-title">{t('marketTitle')}</h3>
@@ -707,6 +709,8 @@ export function DesktopSettingsSection({
           />)}
         </div>}
       </section>
+
+      </>}
 
       <section className="dshDesktopSettingsGroup" aria-labelledby="dsh-desktop-presentation-title">
         <div>

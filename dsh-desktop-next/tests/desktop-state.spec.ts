@@ -29,9 +29,9 @@ it('keeps desktop preferences separate from the Host and validates all IPC-contr
 it('backs up a malformed manifest, repairs without deleting data, and restores the last working config', async () => {
   const { profiles, recovery, home } = environment()
   const dir = profiles.directory('default')
-  const original = readFileSync(join(dir, 'package.json'), 'utf8')
   writeFileSync(join(dir, 'cordis.patch.yml'), '# working\n[]\n')
   profiles.setFeatures('default', { market: true, remoteControl: true })
+  const original = readFileSync(join(dir, 'package.json'), 'utf8')
   recovery.checkpoint('default')
   const checkpoint = recovery.latest('default')!
   recovery.checkpoint('default')
