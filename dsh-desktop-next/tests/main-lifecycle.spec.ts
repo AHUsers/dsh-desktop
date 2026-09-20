@@ -281,8 +281,10 @@ it.each(['complete', 'skip'] as const)('shows first-run onboarding without a Hos
     await command(sender, { type: 'controls' })
     expect(window.loadedUrls).toHaveLength(1)
     expect(fixture.handlers.get('dsh-next:state')!(sender).onboarding).toBe(true)
+    expect(fixture.handlers.get('dsh-next:state')!(sender).onboardingComputerUse).toBe(false)
     await expect(command(sender, { type: 'onboarding-skip', profile: 'other' })).rejects.toThrow('unavailable')
     await expect(command(sender, { type: 'onboarding-complete', profile: 'desktop', features: { market: true, dshMarket: true, remoteControl: true } })).rejects.toThrow('only one')
+    await expect(command(sender, { type: 'onboarding-complete', profile: 'desktop', features: { market: false, remoteControl: false }, computerUse: 'yes' })).rejects.toThrow('Computer Use')
     expect(manager.onboardingRequired('desktop')).toBe(true)
     expect(fixture.start).not.toHaveBeenCalled()
     expect(window.loadedUrls).toHaveLength(1)
@@ -290,10 +292,11 @@ it.each(['complete', 'skip'] as const)('shows first-run onboarding without a Hos
       expect(manager.onboardingRequired('desktop')).toBe(false)
       expect(manager.features('desktop')).toEqual(outcome === 'skip'
         ? { market: true, remoteControl: false } : { market: false, dshMarket: true, remoteControl: true })
+      expect(manager.computerUseEnabled('desktop')).toBe(outcome === 'complete')
       expect(window.visible).toBe(false)
     })
     await command(sender, outcome === 'skip' ? { type: 'onboarding-skip', profile: 'desktop' }
-      : { type: 'onboarding-complete', profile: 'desktop', features: { market: false, dshMarket: true, remoteControl: true } })
+      : { type: 'onboarding-complete', profile: 'desktop', features: { market: false, dshMarket: true, remoteControl: true }, computerUse: true })
     expect(fixture.start).toHaveBeenCalledOnce()
     expect(fixture.windows).toHaveLength(2)
     expect(fixture.windows[1].webContents.mainFrame.url).toBe('dsh-app://app/')

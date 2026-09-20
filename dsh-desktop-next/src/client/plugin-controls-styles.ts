@@ -19,7 +19,7 @@ button.dshNextSettingsGear { width: 28px; padding: 0; }
 .dshNextPluginSettingsNotice > span { flex: 1 1 220px; }
 .dshNextPluginSettingsNotice > button { flex-shrink: 0; }
 .dshNextPluginControls p { margin: 0; }
-.dshNextPermissionsDialog { width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
+.dshNextPermissionsDialog[role="dialog"] { width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
 .dshNextPermissionList { display: grid; gap: 0; }
 .dshNextPermissionRow { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dshNextPermissionRow:last-child { border-bottom: 0; }

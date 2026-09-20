@@ -2,9 +2,10 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { composeEntries, loadOverlayPatches, readProfilePatches } from '@deepseek-ai/dsh-app-boot'
 import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, profileName, WEB_BUNDLES } from '../src/profiles.ts'
+import * as privateFiles from '../src/private-files.ts'
 
 const roots: string[] = []
 function profiles() { const home = mkdtempSync(join(tmpdir(), 'dsh-next-profiles-')); roots.push(home); return new NextProfiles(home) }
@@ -51,12 +52,14 @@ it('records onboarding per Profile together with its plugin choices and retains 
   manifest.custom = 'keep'
   writeFileSync(file, JSON.stringify(manifest))
   expect(manager.onboardingRequired('desktop')).toBe(true)
-  manager.finishOnboarding('desktop', { market: false, dshMarket: true, remoteControl: true })
+  manager.finishOnboarding('desktop', { features: { market: false, dshMarket: true, remoteControl: true }, computerUse: true })
   const reread = new NextProfiles(manager.home)
   reread.ensure('desktop')
   expect(reread.onboardingRequired('desktop')).toBe(false)
   expect(reread.onboardingRequired('work')).toBe(true)
   expect(reread.features('desktop')).toEqual({ market: false, dshMarket: true, remoteControl: true })
+  expect(reread.computerUseEnabled('desktop')).toBe(true)
+  expect(reread.computerUseEnabled('work')).toBe(false)
   expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
     custom: 'keep', dependencies: manifest.dependencies,
     dsh: { desktopNextOnboarding: { version: 1, outcome: 'completed' }, profile: { bundles: expect.arrayContaining(['my-plugin']) } },
@@ -69,13 +72,17 @@ it('skips onboarding without changing current choices, while a recreated Profile
   const manager = profiles()
   const dir = manager.create('work')
   manager.setFeatures('work', { market: false, dshMarket: true, remoteControl: true })
+  const patch = '# existing choice\n- id: computer-use-cua-driver-native\n  disabled: false\n'
+  writeFileSync(join(dir, 'cordis.patch.yml'), patch)
   manager.finishOnboarding('work')
   expect(manager.onboardingRequired('work')).toBe(false)
   expect(manager.features('work')).toEqual({ market: false, dshMarket: true, remoteControl: true })
+  expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')).toBe(patch)
   expect(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dsh.desktopNextOnboarding.outcome).toBe('skipped')
   rmSync(dir, { recursive: true })
   manager.create('work')
   expect(manager.onboardingRequired('work')).toBe(true)
+  expect(manager.computerUseEnabled('work')).toBe(false)
 })
 
 it.each([
@@ -86,9 +93,73 @@ it.each([
   const manager = profiles()
   const file = join(manager.ensure('desktop'), 'package.json')
   const original = readFileSync(file, 'utf8')
-  expect(() => manager.finishOnboarding('desktop', value)).toThrow()
+  expect(() => manager.finishOnboarding('desktop', { features: value, computerUse: false })).toThrow()
   expect(readFileSync(file, 'utf8')).toBe(original)
   expect(manager.onboardingRequired('desktop')).toBe(true)
+})
+
+it.each([true, false])('saves Computer Use=%s in the official row without losing comments, expressions or other overrides', enabled => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  const patchPath = join(dir, 'cordis.patch.yml')
+  writeFileSync(patchPath, `# My Profile\n- id: agent\n  config:\n    label: !!js "'keep'"\n- id: computer-use-cua-driver-native\n  disabled: false # first override\n- id: computer-use-cua-driver-native\n  name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'\n  disabled: true # final override\n`)
+  expect(manager.computerUseEnabled('desktop')).toBe(false)
+  manager.finishOnboarding('desktop', { features: { market: false, remoteControl: false }, computerUse: enabled })
+  const saved = readFileSync(patchPath, 'utf8')
+  expect(saved).toContain('# My Profile')
+  expect(saved).toContain('!!js')
+  expect(saved).toContain('# first override')
+  expect(saved).toContain('# final override')
+  const profile = loadNextProfile(dir, manager.home)
+  const rows = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches])
+  expect(rows.find(row => row.id === 'computer-use-cua-driver-native')?.disabled).toBe(!enabled)
+  expect(manager.computerUseEnabled('desktop')).toBe(enabled)
+  // Subsequent official manager edits own the row; completion never forces it back on.
+  writeFileSync(patchPath, '- id: computer-use-cua-driver-native\n  disabled: true\n')
+  manager.ensure('desktop')
+  expect(manager.computerUseEnabled('desktop')).toBe(false)
+  expect(manager.onboardingRequired('desktop')).toBe(false)
+})
+
+it.each([undefined, 'yes', 1, null])('rejects an invalid Computer Use choice %j before writing either file', computerUse => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  const manifest = readFileSync(join(dir, 'package.json'), 'utf8')
+  const patch = readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')
+  expect(() => manager.finishOnboarding('desktop', { features: { market: false, remoteControl: false }, computerUse })).toThrow('Computer Use')
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(manifest)
+  expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')).toBe(patch)
+})
+
+it('reads the saved enablement through later configuration-only and name-mismatched overrides', () => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  writeFileSync(join(dir, 'cordis.patch.yml'), '- id: computer-use-cua-driver-native\n  disabled: false\n- id: computer-use-cua-driver-native\n  config: {}\n- id: computer-use-cua-driver-native\n  name: another-plugin\n  disabled: true\n')
+  expect(manager.computerUseEnabled('desktop')).toBe(true)
+})
+
+it.each([': broken: [yaml', 'disabled: false\n'])('does not overwrite an invalid patch while completing onboarding: %s', patch => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  const manifest = readFileSync(join(dir, 'package.json'), 'utf8')
+  writeFileSync(join(dir, 'cordis.patch.yml'), patch)
+  expect(() => manager.finishOnboarding('desktop', { features: { market: false, remoteControl: false }, computerUse: true })).toThrow()
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(manifest)
+  expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')).toBe(patch)
+  expect(manager.onboardingRequired('desktop')).toBe(true)
+})
+
+it('restores the original patch and leaves onboarding pending when completion cannot be saved', () => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  const patch = readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')
+  const write = vi.spyOn(privateFiles, 'atomicJson').mockImplementationOnce(() => { throw new Error('Cannot save manifest') })
+  try {
+    expect(() => manager.finishOnboarding('desktop', { features: { market: false, remoteControl: true }, computerUse: true })).toThrow('Cannot save manifest')
+    expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')).toBe(patch)
+    expect(manager.onboardingRequired('desktop')).toBe(true)
+    expect(manager.features('desktop')).toEqual({ market: true, remoteControl: false })
+  } finally { write.mockRestore() }
 })
 it('refuses a symlinked profile before writing outside Next home', () => {
   const manager = profiles()

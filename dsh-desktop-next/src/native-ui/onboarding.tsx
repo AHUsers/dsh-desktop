@@ -1,18 +1,21 @@
 /** AA-inspired first-run flow, using the existing Desktop theme and controls. */
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowLeft, ArrowRight, Check, LifeBuoy, LoaderCircle } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { ArrowLeft, ArrowRight, Check, Keyboard, LifeBuoy, LoaderCircle, MousePointer2, Scan } from 'lucide-react'
 import { Button } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/button.tsx'
 import { Switch } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/switch.tsx'
 import { RadioGroup, RadioGroupItem } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/radio-group.tsx'
 import { Alert, AlertDescription } from '../../../dsh-plugin-desktop-beta/src/native-ui/components/ui/alert.tsx'
 import { DesktopFrame } from '../../../dsh-plugin-desktop-beta/src/native-ui/shared/DesktopFrame.tsx'
 import type { DesktopBridge, DesktopState } from '../desktop-contract.ts'
+import { installPluginControlsStyles } from '../client/plugin-controls-styles.ts'
 import './onboarding.css'
 
 const whaleArtwork = new URL('../../build/app-icon.icon/Assets/DeepSeek.svg?no-inline', import.meta.url).href
 // Reuse the phone artwork from the official AA onboarding instead of a schematic card.
 const phoneArtwork = new URL('./assets/agents-anywhere-phone.webp', import.meta.url).href
 type Market = 'none' | 'community' | 'dsh'
+// Keep official dialog dependencies out of recovery and the earlier setup pages.
+const DesktopPermissionsButton = lazy(() => import('../client/permissions.tsx').then(module => ({ default: module.DesktopPermissionsButton })))
 
 export function Onboarding({ state, locale, bridge }: { state: DesktopState; locale: 'zh' | 'en'; bridge: DesktopBridge }) {
   const t = (zh: string, en: string) => locale === 'zh' ? zh : en
@@ -23,29 +26,33 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
   const [failure, setFailure] = useState('')
   const [market, setMarket] = useState<Market>(state.features.market ? 'community' : state.features.dshMarket ? 'dsh' : 'none')
   const [remote, setRemote] = useState(state.features.remoteControl)
+  const [computerUse, setComputerUse] = useState(state.onboardingComputerUse ?? false)
   const slide = useRef<HTMLDivElement>(null)
   const navigationLock = useRef(false)
   const saving = useRef(false)
   const mounted = useRef(true)
   const animation = useRef<Animation | undefined>(undefined)
   const disabled = busy || transitioning
-  const steps = [t('欢迎', 'Welcome'), t('插件市场', 'Plugin market'), t('远程控制', 'Remote control'), t('恢复模式', 'Recovery')]
-  const titles = [t('欢迎使用\nDSH Desktop Next', 'Welcome to\nDSH Desktop Next'), t('用插件，\n拓展更多可能。', 'Make room\nfor more possibilities.'), t('离开电脑，\n也能继续。', 'Keep going.\nAway from your desk.'), t('遇到问题，\n从这里恢复。', 'A way back,\nwhen you need it.')]
+  const steps = [t('欢迎', 'Welcome'), t('插件市场', 'Plugin market'), t('远程控制', 'Remote control'), 'Computer Use', t('恢复模式', 'Recovery')]
+  const lastPage = steps.length - 1
+  const titles = [t('欢迎使用\nDSH Desktop Next', 'Welcome to\nDSH Desktop Next'), t('用插件，\n拓展更多可能。', 'Make room\nfor more possibilities.'), t('离开电脑，\n也能继续。', 'Keep going.\nAway from your desk.'), t('让 AI 帮你\n操作电脑。', 'Let AI work\non your desktop.'), t('遇到问题，\n从这里恢复。', 'A way back,\nwhen you need it.')]
   const descriptions = [
     t(`为 Profile「${state.selected}」选好常用功能。\n几步设置，就可以开始。`, `Set up the essentials for Profile “${state.selected}”.\nA few choices, then you’re ready to go.`),
     t('选择一个插件市场，浏览和安装社区插件。\n也可以暂不开启，以后在插件页面调整。', 'Choose a market to browse and install community plugins.\nYou can also leave it off and decide later in Plugins.'),
     t('通过 Agents Anywhere，在手机或其他电脑上，\n继续与你的 Agent 对话。', 'Use Agents Anywhere on your phone or another computer\nto keep the conversation going.'),
+    t('查看屏幕内容，操作鼠标和键盘。\n理解截图需要支持图片输入的模型。', 'View the screen and control the mouse and keyboard.\nUnderstanding screenshots requires a model with image input.'),
     t('恢复助手可以在 Profile 无法启动时打开。\n先检查问题，再选择合适的恢复方式。', 'The recovery assistant works even when a Profile cannot start.\nCheck what happened, then choose how to recover.'),
   ]
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; animation.current?.cancel() } }, [])
+  useEffect(installPluginControlsStyles, [])
   useEffect(() => {
     if (page > 0 || direction < 0) slide.current?.querySelector('h1')?.focus({ preventScroll: true })
     slide.current?.closest('main')?.scrollTo({ top: 0 })
   }, [page, direction])
 
   async function navigate(next: number) {
-    if (navigationLock.current || saving.current || next < 0 || next > 3) return
+    if (navigationLock.current || saving.current || next < 0 || next > lastPage) return
     navigationLock.current = true
     setTransitioning(true)
     const nextDirection = next > page ? 1 : -1
@@ -68,7 +75,7 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
     setBusy(true); setFailure('')
     try {
       await bridge.command(skip ? { type: 'onboarding-skip', profile: state.selected }
-        : { type: 'onboarding-complete', profile: state.selected, features: {
+        : { type: 'onboarding-complete', profile: state.selected, computerUse, features: {
           market: market === 'community', dshMarket: market === 'dsh', remoteControl: remote,
         } })
     } catch (error) {
@@ -95,9 +102,21 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
           {page > 0 && <p className="next-onboarding-eyebrow">{steps[page]}</p>}
           <h1 id="onboarding-title" tabIndex={-1}>{titles[page]!.split('\n').map((line, i) => <span className="next-onboarding-reveal" key={i} style={{ animationDelay: `${80 + i * 130}ms` }}>{line}</span>)}</h1>
           <p className="next-onboarding-description next-onboarding-reveal">{descriptions[page]}</p>
-          {page === 2 && <div className="next-onboarding-remote-option next-onboarding-reveal">
+          {page === 2 && <div className="next-onboarding-option next-onboarding-reveal">
             <div className="next-onboarding-toggle"><label htmlFor="onboarding-remote">{t('启用远程控制', 'Enable remote control')}</label><Switch id="onboarding-remote" checked={remote} disabled={disabled} onCheckedChange={setRemote} /></div>
             <p>{t('完成后，在侧边栏的“手机连接”中登录并配对。', 'After setup, sign in and pair your device in “Phone connect” in the sidebar.')}</p>
+          </div>}
+          {page === 3 && <div className="next-onboarding-option next-onboarding-reveal">
+            <div className="next-onboarding-toggle">
+              <label htmlFor="onboarding-computer-use">{t('启用 Computer Use', 'Enable Computer Use')}</label>
+              <div className="next-onboarding-option-actions">
+                <Suspense fallback={<span className="next-onboarding-permissions-loading" aria-hidden="true"><LoaderCircle className="animate-spin" /></span>}>
+                  <DesktopPermissionsButton service={bridge.permissions} language={locale} iconOnly disabled={disabled} />
+                </Suspense>
+                <Switch id="onboarding-computer-use" checked={computerUse} disabled={disabled} onCheckedChange={setComputerUse} />
+              </div>
+            </div>
+            <p>{t('通过齿轮设置系统权限，也可以稍后在插件页面调整。', 'Use the gear to manage system permissions. You can also change these settings later in Plugins.')}</p>
           </div>}
         </section>
         <aside className="next-onboarding-panel next-onboarding-reveal" aria-label={steps[page]}>
@@ -113,7 +132,18 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
           {page === 2 && <figure className="next-onboarding-phone" aria-hidden="true">
             <img src={phoneArtwork} width="800" height="1649" alt="" draggable={false} />
           </figure>}
-          {page === 3 && <div className="next-onboarding-recovery">
+          {page === 3 && <figure className="next-onboarding-computer" data-enabled={computerUse} aria-hidden="true">
+            <div className="next-onboarding-screen">
+              <div className="next-onboarding-screen-toolbar"><i /><i /><i /></div>
+              <div className="next-onboarding-screen-content">
+                <div className="next-onboarding-screen-sidebar"><i /><i /><i /></div>
+                <div className="next-onboarding-screen-document"><i /><i /><i /><div className="next-onboarding-screen-selection" /></div>
+              </div>
+              <MousePointer2 className="next-onboarding-pointer" />
+            </div>
+            <figcaption><span><Scan />{t('查看', 'See')}</span><span><MousePointer2 />{t('点击', 'Click')}</span><span><Keyboard />{t('输入', 'Type')}</span></figcaption>
+          </figure>}
+          {page === 4 && <div className="next-onboarding-recovery">
             <LifeBuoy aria-hidden="true" />
             <ol>
               <li><strong>{t('打开恢复助手', 'Open the recovery assistant')}</strong><p>{t('托盘菜单 → 恢复助手。也可以在设置的“重启”菜单中选择进入恢复模式。', 'Choose Recovery Assistant in the tray menu, or restart into recovery from the Restart menu in Settings.')}</p></li>
@@ -123,8 +153,8 @@ export function Onboarding({ state, locale, bridge }: { state: DesktopState; loc
           </div>}
         </aside>
         <div className="next-onboarding-actions">
-          <Button className="next-onboarding-next" size="lg" disabled={disabled} onClick={() => void (page === 3 ? finish(false) : navigate(page + 1))}>
-            {busy ? <><LoaderCircle className="animate-spin" />{t('正在进入…', 'Opening…')}</> : page === 3 ? <>{t('完成并开始', 'Finish and start')}<Check /></> : <>{t('下一步', 'Continue')}<ArrowRight /></>}
+          <Button className="next-onboarding-next" size="lg" disabled={disabled} onClick={() => void (page === lastPage ? finish(false) : navigate(page + 1))}>
+            {busy ? <><LoaderCircle className="animate-spin" />{t('正在进入…', 'Opening…')}</> : page === lastPage ? <>{t('完成并开始', 'Finish and start')}<Check /></> : <>{t('下一步', 'Continue')}<ArrowRight /></>}
           </Button>
         </div>
       </div>

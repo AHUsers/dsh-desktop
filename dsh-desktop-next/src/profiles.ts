@@ -7,6 +7,7 @@ import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { atomicJson, atomicText, readPrivateFile } from './private-files.ts'
 import { NextRecovery } from './recovery.ts'
 import { DEFAULT_PROFILE } from './desktop-contract.ts'
+import { computerUsePatch } from './profile-computer-use.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
 export const WEB_BUNDLES = [...PROFILE_TEMPLATES.web!.bundles, 'dsh-desktop-next']
@@ -15,6 +16,7 @@ export const COMMUNITY_MARKET_PACKAGE = 'dsh-community-market'
 export const DSH_MARKET_PACKAGE = 'dshmarket'
 /** Legacy shell shape, now projected from the standard Profile bundle selection. */
 export interface Features { remoteControl: boolean; market: boolean; dshMarket?: boolean }
+export interface OnboardingChoices { features: Features; computerUse: boolean }
 export const DEFAULT_FEATURES: Readonly<Features> = { remoteControl: false, market: true }
 
 interface ProfileManifest {
@@ -127,16 +129,40 @@ export class NextProfiles {
     const saved = this.manifest(name).dsh.desktopNextOnboarding
     return saved?.version !== 1 || !['completed', 'skipped'].includes(saved.outcome)
   }
-  /** One atomic write stores both the choices and completion in this Profile. Skip preserves its choices. */
+  /** Read the saved native-provider choice without importing any user plugin. */
+  computerUseEnabled(name: string): boolean {
+    return computerUsePatch(readPrivateFile(join(this.directory(name), 'cordis.patch.yml')) ?? '[]\n').enabled
+  }
+  /** Save choices before completion. Skip preserves both bundles and the user's patch verbatim. */
   finishOnboarding(name: string, value?: unknown): void {
     const manifest = this.manifest(name)
+    const patchPath = join(this.directory(name), 'cordis.patch.yml')
+    let originalPatch: string | undefined
+    let nextPatch: string | undefined
     if (value !== undefined) {
-      const features = parseFeatures(value)
+      if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.keys(value).some(key => !['features', 'computerUse'].includes(key))) throw new Error('Invalid onboarding choices')
+      const choices = value as Record<string, unknown>
+      const features = parseFeatures(choices.features)
       if (features.market && features.dshMarket) throw new Error('Select only one plugin market')
+      if (typeof choices.computerUse !== 'boolean') throw new Error('Invalid Computer Use choice')
+      originalPatch = readPrivateFile(patchPath)
+      nextPatch = computerUsePatch(originalPatch ?? '[]\n', choices.computerUse).text
       applyFeatures(manifest, features)
     }
     manifest.dsh.desktopNextOnboarding = { version: 1, outcome: value === undefined ? 'skipped' : 'completed' }
-    atomicJson(join(this.directory(name), 'package.json'), manifest)
+    const patchChanged = nextPatch !== undefined && nextPatch !== originalPatch
+    if (patchChanged && nextPatch !== undefined) atomicText(patchPath, nextPatch)
+    try {
+      // Completion is the final write: a failed/interrupted save must never start the Host.
+      atomicJson(join(this.directory(name), 'package.json'), manifest)
+    } catch (error) {
+      if (patchChanged) {
+        if (originalPatch === undefined) unlinkSync(patchPath)
+        else atomicText(patchPath, originalPatch)
+      }
+      throw error
+    }
   }
   /** Once per Profile, preserve the old choices without overriding future plugin-manager edits. */
   migrateFeatures(name: string): void {

@@ -246,9 +246,9 @@ try {
   await switchedState.body?.cancel()
   await stop()
   if (process.argv.includes('--computer-use')) {
-    const cua = manager.create('computer-use')
-    manager.setFeatures('computer-use', { remoteControl: false, market: false })
-    writeFileSync(join(cua, 'cordis.patch.yml'), '- id: computer-use-cua-driver-native\n  disabled: false\n')
+    manager.create('computer-use')
+    manager.finishOnboarding('computer-use', { features: { remoteControl: false, market: false }, computerUse: true })
+    assert.equal(manager.onboardingRequired('computer-use'), false)
     const enabled = await boot('computer-use')
     const rpcId = crypto.randomUUID()
     const response = await fetch(`${enabled.origin}/api/pluginManager/listPlugins`, {
@@ -262,8 +262,14 @@ try {
     const provider = reply.result.value.find(row => row.moduleName === '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native')
     assert.equal(provider?.enabled, true)
     assert.equal(provider?.fiberPhase, 'active', JSON.stringify(provider))
+    // Onboarding writes a normal Profile row; official settings must remain authoritative.
+    ;({ origin, cookie } = enabled)
+    const disabled = await rpc('setPluginEnabled', { id: provider.entryId, enabled: false })
+    assert.equal(disabled.application, 'applied', JSON.stringify(disabled))
+    assert.equal((await rpc('listPlugins')).find(row => row.entryId === provider.entryId)?.enabled, false)
+    assert.equal(manager.computerUseEnabled('computer-use'), false)
     await stop()
-    console.log('Opt-in Cua native provider activation and teardown passed without capturing screens, sending input or prompting for OS permissions.')
+    console.log('Onboarding Cua native provider activation and teardown passed without capturing screens, sending input or prompting for OS permissions.')
   }
   console.log(`Next Host smoke passed (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'}): authenticated alpha.2 Web, exclusive market selection and independent AA persisted, official row toggles, dshmarket offline install and cross-market removal, official install/remove with a freshly published locked dependency, native dshmarket update origin gate, graceful shutdown, recovery boot and profile switch.`)
 } finally {
