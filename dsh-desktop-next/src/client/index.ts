@@ -15,6 +15,7 @@ import { installWindowStyles } from './styles.ts'
 import { registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
 import { SettingsRequests } from './settings-requests.tsx'
+import { registerNativeSidebarBrowser } from './sidebar-browser.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop-beta/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -35,6 +36,7 @@ export function apply(ctx: Context): void {
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
   registerPluginControls(ctx)
   if (window.desktopNext) {
+    if (window.desktopNext.sidebarBrowser) registerNativeSidebarBrowser(ctx, window.desktopNext.sidebarBrowser)
     const permissions = window.desktopNext.permissions
     if (permissions) ctx.effect(() => {
       const dispose = ctx.reflect.provide('desktopPermissions', permissions)

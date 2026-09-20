@@ -8,6 +8,7 @@ import { syncWindowMaterial } from './preload-material.ts'
 import { syncNativeLocale } from './preload-locale.ts'
 import { permissionBridge } from './preload-permissions.ts'
 import { onOpenSettings } from './preload-settings.ts'
+import { sidebarBrowserBridge } from './preload-sidebar-browser.ts'
 
 if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   markDocumentPlatform()
@@ -17,6 +18,7 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   syncWindowMaterial()
   contextBridge.exposeInMainWorld('desktopNext', {
     permissions: permissionBridge(),
+    sidebarBrowser: sidebarBrowserBridge(),
     onOpenSettings,
     state: () => ipcRenderer.invoke(IPC.state),
     browserLinks: () => ipcRenderer.invoke(IPC.browserLinks),

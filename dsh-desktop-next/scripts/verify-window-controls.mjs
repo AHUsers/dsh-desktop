@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { DesktopHostProcess } from '../lib/host-process.js'
 import { NextProfiles } from '../lib/profiles.js'
 import { authenticateWebHost, serveWebDocument } from '../lib/web-document.js'
+import { browserFixture, verifySidebarBrowser, verifyWebBrowserFallback } from './verify-sidebar-browser-ui.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const require = createRequire(import.meta.url)
@@ -39,6 +40,7 @@ try {
     ...(process.env.DSH_NEXT_TEST_BROWSER_CHANNEL ? { channel: process.env.DSH_NEXT_TEST_BROWSER_CHANNEL } : {}),
   })
   const context = await browser.newContext({ viewport: { width: 1280, height: 840 }, locale: 'zh-CN', colorScheme: 'dark' })
+  const nativeBrowser = await browserFixture(context)
   await context.addInitScript(path => { globalThis.__DSH_DIRECTORY_PICKER__ = { pick: async () => path } }, workspace)
   // Chromium classifies the intercepted document separately from its loopback Host.
   await context.grantPermissions(['local-network-access'], { origin: streamBaseUrl })
@@ -86,6 +88,10 @@ try {
   })
   await context.addInitScript(() => {
     window.desktopNext = { state: () => window.__nextTestState(), browserLinks: () => window.__nextTestBrowserLinks(), command: command => window.__nextTestCommand(command) }
+    window.desktopNext.sidebarBrowser = {
+      command: request => window.__nextBrowserCommand(request),
+      subscribe: listener => { window.__nextBrowserEmit = listener; return () => { delete window.__nextBrowserEmit } },
+    }
     window.desktopNext.onOpenSettings = listener => {
       window.__nextTestOpenSettings = listener
       return () => { delete window.__nextTestOpenSettings }
@@ -450,6 +456,7 @@ try {
   await reopen.waitFor({ state: 'visible' })
   await page.screenshot({ path: join(screenshots, 'blank-session-collapsed.png'), animations: 'disabled' })
   await expand()
+  await verifySidebarBrowser(page, nativeBrowser, screenshots)
 
   // Other platforms retain their own native chrome; no macOS drag region leaks through.
   for (const platform of ['win32', 'linux']) {
@@ -631,10 +638,12 @@ try {
   await webPage.locator('[data-next-plugin-controls]').waitFor()
   await webPage.locator('[data-next-computer-use]').getByRole('button', { name: /^(授权设置|Permissions)$/ }).click()
   await webPage.getByRole('dialog', { name: /^(系统权限|System permissions)$/ }).getByText(/请在运行 DSH 的桌面应用中管理系统权限/).waitFor()
+  await webPage.getByRole('dialog', { name: /^(系统权限|System permissions)$/ }).press('Escape')
+  await verifyWebBrowserFallback(webPage)
   await webContext.close()
   assert.deepEqual(errors, [])
   assert.deepEqual(await page.evaluate(() => globalThis.__NEXT_TEST_BOOT__.failures), [])
-  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: stacked sidebar extension entries, homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, per-address login URL rows with exact open/copy targets, Profile cards and tray creation, and the Host-independent recovery artifact. Chromium simulates the preload contract; native Electron window movement is not tested.')
+  console.log('Next window controls passed through the official alpha.2 Desktop boot branch: stacked sidebar extension entries, homepage/plugin collapse and reopen, navigation, caption geometry, clickable actions, existing-header and platform isolation, official Settings header shortcuts and keyboard navigation, grouped Desktop Settings and immediate saves, per-address login URL rows with exact open/copy targets, Profile cards and tray creation, the Host-independent recovery artifact, and native Browser toolbar, navigation, pane geometry, overlay isolation, tab lifetime and Web iframe fallback. Chromium simulates the preload contract; native Electron window movement and page loading are not tested here.')
   console.log(`Screenshots: ${screenshots}`)
 } catch (error) {
   console.error(error)

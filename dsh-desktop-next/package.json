@@ -18,6 +18,7 @@
     "verify:frontend": "node scripts/verify-frontend.mjs",
     "verify:window-controls": "node scripts/verify-window-controls.mjs",
     "verify:protocol": "electron scripts/verify-protocol.mjs",
+    "verify:sidebar-browser": "electron scripts/verify-sidebar-browser.mjs",
     "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host && yarn verify:desktop-runtime",
     "dev": "yarn build && node scripts/start.mjs",
     "start": "node scripts/start.mjs",
@@ -188,6 +189,8 @@
   },
   "devDependencies": {
     "@base-ui/react": "^1.7.0",
+    "@deepseek-ai/dsh-client-ui-sidebar-browser": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.1.6-alpha.2",
     "@deepseek-ai/dsh-host-open-in-app": "0.1.6-alpha.2",
     "@fontsource-variable/inter": "^5.3.0",
     "@tailwindcss/vite": "^4",

@@ -24,6 +24,7 @@ import { privateDirectory } from './private-files.ts'
 import { supportsMica, windowMaterial } from './window-material.ts'
 import { RECOVERY_ARGUMENT, SAFE_ARGUMENT, relaunchArguments } from './relaunch.ts'
 import { createNativePermissions, installMediaPermissions } from './electron-permissions.ts'
+import { NativeSidebarBrowser } from './sidebar-browser.ts'
 
 const root = dirname(NEXT_PACKAGE)
 const home = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? join(root, '.desktop-next', 'home'))
@@ -36,6 +37,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'dsh-app', privileges: {
 } }])
 
 let mainWindow: BrowserWindow | undefined
+let sidebarBrowser: NativeSidebarBrowser | undefined
 let shellWindow: BrowserWindow | undefined
 let pendingSettings: DesktopSettingsPage | undefined
 let quitting = false
@@ -164,7 +166,16 @@ function openMain(): void {
   if (runtime.recoveryMode) { openControls('recovery'); return }
   if (mainWindow && !mainWindow.isDestroyed()) { show(mainWindow); return }
   mainWindow = createWindow('preload-app.cjs', true)
-  mainWindow.on('closed', () => { mainWindow = undefined })
+  const owner = mainWindow
+  const browser = new NativeSidebarBrowser(owner, state => {
+    if (!owner.webContents.isDestroyed()) owner.webContents.send(IPC.sidebarBrowserState, state)
+  }, () => runtime.auth ? [new URL(runtime.auth.url).origin] : [])
+  sidebarBrowser = browser
+  owner.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => {
+    if (isMainFrame && !inPlace) browser.dispose()
+  })
+  owner.webContents.on('render-process-gone', () => browser.dispose())
+  mainWindow.on('closed', () => { browser.dispose(); sidebarBrowser = undefined; mainWindow = undefined })
   mainWindow.webContents.on('render-process-gone', (_event, details) => { if (!quitting) runtime.report(new Error(`Renderer: ${details.reason}`)) })
   mainWindow.webContents.on('preload-error', (_event, _path, error) => runtime.report(error))
   mainWindow.webContents.on('did-fail-load', (_event, code, message, _url, isMain) => {
@@ -328,6 +339,11 @@ async function main(): Promise<void> {
     return page
   })
   ipcMain.handle(IPC.browserLinks, event => { assertDesktopSender(event); return runtime.browserLinks() })
+  ipcMain.handle(IPC.sidebarBrowser, (event, command: unknown) => {
+    assertSender(event, mainWindow, APP_URL)
+    if (quitting || !sidebarBrowser) throw new Error('Desktop browser is unavailable')
+    return sidebarBrowser.command(command)
+  })
   ipcMain.handle(IPC.permissionQuery, (event, permission: unknown) => { assertDesktopSender(event); return permissions.query(permission) })
   const permissionGesture = async (event: IpcMainInvokeEvent): Promise<void> => {
     assertDesktopSender(event)

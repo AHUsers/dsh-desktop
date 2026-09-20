@@ -39,6 +39,17 @@ for (const platform of ['darwin', 'win32', 'linux']) {
       navigator: { userActivation },
     }, { filename: entry })
     if (hostname === 'app') {
+      const sidebar = exposed.get('desktopNext').sidebarBrowser
+      await sidebar.command({ type: 'open', id: 'smoke' })
+      assert.equal(invocations.at(-1)[0], 'dsh-next:sidebar-browser')
+      const browserStates = []
+      const stopBrowser = sidebar.subscribe((...args) => browserStates.push(args))
+      const state = { id: 'smoke', revision: 1, url: 'https://example.com/' }
+      listeners.get('dsh-next:sidebar-browser-state')({ privilegedEvent: true }, state)
+      assert.equal(browserStates[0].length, 1, 'The Electron event must never cross the bridge')
+      assert.equal(browserStates[0][0], state)
+      stopBrowser()
+      assert.equal(listeners.has('dsh-next:sidebar-browser-state'), false)
       const received = []
       const stop = exposed.get('desktopNext').onOpenSettings(page => received.push(page))
       await new Promise(resolve => setTimeout(resolve, 0))
@@ -53,7 +64,10 @@ for (const platform of ['darwin', 'win32', 'linux']) {
       assert.deepEqual(received, ['general', 'permissions'])
       stop()
       assert.equal(listeners.has('dsh-next:settings-open'), false)
-    } else assert.equal(exposed.get('desktopNext').onOpenSettings, undefined)
+    } else {
+      assert.equal(exposed.get('desktopNext').onOpenSettings, undefined)
+      assert.equal(exposed.get('desktopNext').sidebarBrowser, undefined)
+    }
   }
   assert.equal(dataset.platform, platform)
   assert.equal(exposed.get('dshDesktop')?.protocolVersion, 1)

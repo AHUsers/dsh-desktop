@@ -3079,6 +3079,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-client-ui-sidebar-browser@patch:@deepseek-ai/dsh-client-ui-sidebar-browser@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-sidebar-browser-0.1.6-alpha.2.tgz#./patches/dsh-client-ui-sidebar-browser@0.1.6-alpha.2.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.6-alpha.2
+  resolution: "@deepseek-ai/dsh-client-ui-sidebar-browser@patch:@deepseek-ai/dsh-client-ui-sidebar-browser@file%3Avendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-sidebar-browser-0.1.6-alpha.2.tgz%23vendor/dsh-runtime/0.1.6-alpha.2/deepseek-ai-dsh-client-ui-sidebar-browser-0.1.6-alpha.2.tgz%3A%3Ahash=e11296&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-client-ui-sidebar-browser@0.1.6-alpha.2.patch::version=0.1.6-alpha.2&hash=5e04c6&locator=deepseek-harness-desktop%40workspace%3A."
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.2
+  checksum: 10c0/766e8fa413cc6843b4d8c08fd1a91c0a3c0c8a53e2da5d0efb19900cedee462189c7bbc249c9f4b419baf747afb8b6a2f6a028d611219676d3ca6addf73c11f2
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-client-ui-sidebar-documentpreview@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-sidebar-documentpreview-0.1.5-rc.2.tgz::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.1.5-rc.2
   resolution: "@deepseek-ai/dsh-client-ui-sidebar-documentpreview@file:vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-sidebar-documentpreview-0.1.5-rc.2.tgz#vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-sidebar-documentpreview-0.1.5-rc.2.tgz::hash=df253b&locator=deepseek-harness-desktop%40workspace%3A."
@@ -13638,6 +13647,8 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-session": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-settings": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-sidebar": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-client-ui-sidebar-browser": "npm:0.1.6-alpha.2"
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-slots": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-theme": "npm:0.1.6-alpha.2"
     "@deepseek-ai/dsh-client-ui-tool": "npm:0.1.6-alpha.2"
