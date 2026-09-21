@@ -1,0 +1,121 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -14957,7 +14957,11 @@
+ 			return (0, react_jsx_runtime.jsxs)("div", {
+ 				className: ConversationRoot_module_css_default.root,
+ 				"data-phase": phase,
+-				children: [sessionId === void 0 ? null : renderSlot("conversation.session.header", {}), renderFactorySlot("conversation.content", {
++				children: [sessionId === void 0 ? (0, _deepseek_ai_dsh_client_ui_primitives.isDarwinDesktop)() ? (0, react_jsx_runtime.jsx)(ConversationHeader, {
++					blank: true,
++					empty: true,
++					leading: renderSlot("conversation.empty.header.leading", {})
++				}) : null : renderSlot("conversation.session.header", {}), renderFactorySlot("conversation.content", {
+ 					variant: "main",
+ 					phase,
+ 					hero
+@@ -15366,6 +15370,27 @@
+ 		* @param props - Strict Session store, view ledger, navigation, render, and locale shares.
+ 		* @returns Session navigation controls, with title and tabs after conversation starts.
+ 		*/
++		/** Shared official header frame for both bound and not-yet-created Sessions. */
++		function ConversationHeader({ blank, leading, title, corner, tabs, empty }) {
++			return (0, react_jsx_runtime.jsxs)("header", {
++				className: clsx(ConversationRoot_module_css_default.header, blank && ConversationRoot_module_css_default.headerBlank),
++				"data-conversation-header": "",
++				"data-conversation-empty-header": empty ? "" : void 0,
++				children: [(0, react_jsx_runtime.jsxs)("div", {
++					className: ConversationRoot_module_css_default.titleRow,
++					"data-conversation-title-row": "",
++					children: [(0, react_jsx_runtime.jsx)("div", {
++						className: ConversationRoot_module_css_default.headerLeading,
++						"data-conversation-header-leading": "",
++						children: leading
++					}), title, (0, react_jsx_runtime.jsx)("div", {
++						className: ConversationRoot_module_css_default.headerCorner,
++						"data-conversation-header-corner": "",
++						children: corner
++					})]
++				}), tabs]
++			});
++		}
+ 		function ConversationSessionHeader({ sessionId, useSession, useSessions, useConversation, useConversationViews, useStore, renderSlot, open, selectView, t }) {
+ 			const tabs = useConversationViews((value) => value);
+ 			const active = resolveActiveView(tabs, useStore((s) => s.view));
+@@ -15373,17 +15398,10 @@
+ 			const session = useSession((s) => s);
+ 			const conversation = useConversation((s) => s);
+ 			const hideChrome = session.blank && conversationPhase(session, conversation) === "blank";
+-			return (0, react_jsx_runtime.jsxs)("header", {
+-				className: clsx(ConversationRoot_module_css_default.header, hideChrome && ConversationRoot_module_css_default.headerBlank),
+-				children: [(0, react_jsx_runtime.jsxs)("div", {
+-					className: ConversationRoot_module_css_default.titleRow,
+-					children: [
+-						(0, react_jsx_runtime.jsx)("div", {
+-							className: ConversationRoot_module_css_default.headerLeading,
+-							"data-conversation-header-leading": "",
+-							children: renderSlot("conversation.session.header.leading", {})
+-						}),
+-						!hideChrome && (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("div", {
++			return (0, react_jsx_runtime.jsx)(ConversationHeader, {
++				blank: hideChrome,
++				leading: renderSlot("conversation.session.header.leading", {}),
++				title: !hideChrome && (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("div", {
+ 							className: ConversationRoot_module_css_default.titleCluster,
+ 							children: [(0, react_jsx_runtime.jsxs)("nav", {
+ 								className: ConversationRoot_module_css_default.crumbs,
+@@ -15426,13 +15444,8 @@
+ 							className: ConversationRoot_module_css_default.headerUtilities,
+ 							children: renderSlot("conversation.session.header.utilities", {})
+ 						})] }),
+-						(0, react_jsx_runtime.jsx)("div", {
+-							className: ConversationRoot_module_css_default.headerCorner,
+-							"data-conversation-header-corner": "",
+-							children: renderSlot("conversation.session.header.corner", {})
+-						})
+-					]
+-				}), !hideChrome && tabs.length > 1 && (0, react_jsx_runtime.jsx)("div", {
++				corner: renderSlot("conversation.session.header.corner", {}),
++				tabs: !hideChrome && tabs.length > 1 && (0, react_jsx_runtime.jsx)("div", {
+ 					className: ConversationRoot_module_css_default.tabs,
+ 					role: "tablist",
+ 					children: tabs.map((viewTab) => (0, react_jsx_runtime.jsx)("button", {
+@@ -15445,7 +15458,7 @@
+ 						},
+ 						children: viewTab.label
+ 					}, viewTab.id))
+-				})]
++				})
+ 			});
+ 		}
+ 		/**
+@@ -16828,7 +16841,7 @@
+ 			});
+ 			const registerConversationRoot = () => slots.register({
+ 				name: "main.conversation",
+-				children: { "conversation.session.header": {
++				children: { "conversation.empty.header.leading": { kind: "single", scope: "root" }, "conversation.session.header": {
+ 					kind: "single",
+ 					scope: "session"
+ 				} }
+diff --git a/lib/types/client/contract/slots.d.ts b/lib/types/client/contract/slots.d.ts
+--- a/lib/types/client/contract/slots.d.ts
++++ b/lib/types/client/contract/slots.d.ts
+@@ -128,6 +128,8 @@
+             };
+         };
+         /** Strict per-Session title, actions, and View navigation. */
++        /** Reuses sidebar controls before a Session exists. */
++        'conversation.empty.header.leading': { kind: 'single'; scope: 'root'; };
+         'conversation.session.header': {
+             kind: 'single';
+             scope: 'session';
+@@ -470,7 +472,7 @@
+     className?: string | undefined;
+ }
+ /** Full props of the resident optional-Session Conversation shell. */
+-export type ConversationSlotProps = PropsRuntime<'main.conversation'> & PropsRenderSlots<'conversation.session.header'> & PropsRenderFactories;
++export type ConversationSlotProps = PropsRuntime<'main.conversation'> & PropsRenderSlots<'conversation.session.header' | 'conversation.empty.header.leading'> & PropsRenderFactories;
+ /** Inputs shared by main and embedded Conversation content occurrences. */
+ export interface ConversationContentInputProps {
+     variant: 'main' | 'embedded';

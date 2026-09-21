@@ -1,0 +1,118 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -244,13 +244,19 @@
+ 		}
+ 		/** Browser tab renderer for a controller-owned URL state and Web iframe carrier. */
+ 		function BrowserBody(props) {
++			return props.renderSlot("sidebar.browser.carrier", { bodyProps: props, Body: BrowserBodyView }, {
++				fallback: (0, react_jsx_runtime.jsx)(BrowserBodyView, props)
++			});
++		}
++		function BrowserBodyView(props) {
++			const native = props.native;
+ 			const { goBack, goForward, loadUrl, mount, reload, reportLoaded, reportLoadFailed, toggleSandbox, useBrowserFrame, useStore, useTabInfo, t } = props;
+ 			const { tab } = useTabInfo();
+ 			const state = useStore((snapshot) => snapshot.byTab[tab.id]) ?? BrowserNavigation.empty();
+ 			const initialState = (0, react.useRef)(state);
+ 			const initialUrl = (0, react.useRef)(tab.navigation.params?.url);
+ 			const current = BrowserNavigation.current(state);
+-			const [draft, setDraft] = useBrowserDraft(current?.url ?? initialUrl.current, state.request?.revision);
++			const [draft, setDraft] = useBrowserDraft(native ? native.url : current?.url ?? initialUrl.current, native ? native.url : state.request?.revision);
+ 			const [mountCount, setMountCount] = (0, react.useState)(0);
+ 			(0, react.useEffect)(() => {
+ 				mount(tab.id, tab.signal, window.location.origin, initialState.current);
+@@ -261,7 +267,7 @@
+ 				tab.signal
+ 			]);
+ 			(0, react.useEffect)(() => {
+-				if (mountCount === 0) return;
++				if (mountCount === 0 || native) return;
+ 				if (BrowserNavigation.current(initialState.current) !== void 0) {
+ 					reload(tab.id);
+ 					return;
+@@ -274,14 +280,17 @@
+ 				reload,
+ 				tab.id
+ 			]);
+-			const { document, sandboxed, loadFailed } = useBrowserFrame(tab.id) ?? INITIAL_BROWSER_FRAME;
+-			const navigationUnknown = state.navigation.status === "unknown";
+-			const externalUrl = navigationUnknown ? void 0 : current?.url;
++			const frame = useBrowserFrame(tab.id) ?? INITIAL_BROWSER_FRAME;
++			const { document } = frame;
++			const sandboxed = native ? true : frame.sandboxed;
++			const loadFailed = native ? false : frame.loadFailed;
++			const navigationUnknown = !native && state.navigation.status === "unknown";
++			const externalUrl = native ? native.url : navigationUnknown ? void 0 : current?.url;
+ 			const submit = (event) => {
+ 				event.preventDefault();
+-				loadUrl(tab.id, draft);
++				if (native) native.navigate(draft); else loadUrl(tab.id, draft);
+ 			};
+-			const failure = state.failure === void 0 ? void 0 : failureText(state.failure.reason, t);
++			const failure = native ? native.error ?? void 0 : state.failure === void 0 ? void 0 : failureText(state.failure.reason, t);
+ 			const placeholder = current === void 0 ? t("start") : t("loading");
+ 			return (0, react_jsx_runtime.jsxs)("div", {
+ 				className: Browser_module_css_default.root,
+@@ -295,9 +304,9 @@
+ 								className: Browser_module_css_default.tool,
+ 								"aria-label": t("back"),
+ 								title: t("back"),
+-								disabled: !BrowserNavigation.canGoBack(state),
++								disabled: native ? !native.canGoBack : !BrowserNavigation.canGoBack(state),
+ 								onClick: () => {
+-									goBack(tab.id);
++									if (native) native.back(); else goBack(tab.id);
+ 								},
+ 								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronLeftOutline14, {})
+ 							}),
+@@ -306,9 +315,9 @@
+ 								className: Browser_module_css_default.tool,
+ 								"aria-label": t("forward"),
+ 								title: t("forward"),
+-								disabled: !BrowserNavigation.canGoForward(state),
++								disabled: native ? !native.canGoForward : !BrowserNavigation.canGoForward(state),
+ 								onClick: () => {
+-									goForward(tab.id);
++									if (native) native.forward(); else goForward(tab.id);
+ 								},
+ 								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronRightOutline14, {})
+ 							}),
+@@ -317,9 +326,9 @@
+ 								className: Browser_module_css_default.tool,
+ 								"aria-label": t("reload"),
+ 								title: t("reload"),
+-								disabled: current === void 0,
++								disabled: native ? !native.url : current === void 0,
+ 								onClick: () => {
+-									reload(tab.id);
++									if (native) native.reload(); else reload(tab.id);
+ 								},
+ 								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {})
+ 							}),
+@@ -361,7 +370,7 @@
+ 								},
+ 								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRightUpOutline16, { size: 14 })
+ 							}),
+-							(0, react_jsx_runtime.jsx)("button", {
++							!native && (0, react_jsx_runtime.jsx)("button", {
+ 								type: "button",
+ 								className: `${Browser_module_css_default.tool} ${sandboxed ? "" : Browser_module_css_default.sandboxOff}`,
+ 								"aria-label": t(sandboxed ? "sandbox.disable" : "sandbox.enable"),
+@@ -390,7 +399,7 @@
+ 						role: "alert",
+ 						children: failure
+ 					}),
+-					document === void 0 ? (0, react_jsx_runtime.jsx)("div", {
++					native ? (0, react_jsx_runtime.jsx)("div", { className: Browser_module_css_default.frame, children: native.content }) : document === void 0 ? (0, react_jsx_runtime.jsx)("div", {
+ 						className: Browser_module_css_default.start,
+ 						children: placeholder
+ 					}) : (0, react_jsx_runtime.jsx)("iframe", {
+@@ -803,6 +812,7 @@
+ 				key: BROWSER_ID,
+ 				locale: namespace,
+ 				store,
++				children: { "sidebar.browser.carrier": { kind: "single", scope: "session" } },
+ 				inject: (_sessionId, actions) => createBrowserControllers(actions)
+ 			}, BrowserBody)), "ui-sidebar-browser.body");
+ 			ctx.effect(() => ctx.slots.inject("sidebar.right.pane.tab.title", () => ctx.slots.register({

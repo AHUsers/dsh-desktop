@@ -11,12 +11,6 @@ import {
   DSH_1024STORE_PROVIDER_ID,
 } from '../src/adapters/dsh-1024store.js'
 import {
-  DSH_MARKETPLACE_ADAPTER_ID,
-  DSH_MARKETPLACE_KEY,
-  DSH_MARKETPLACE_PROVIDER_ID,
-  DSH_MARKETPLACE_PUBLIC_ENDPOINT,
-} from '../src/adapters/dsh-marketplace.js'
-import {
   DSHFIND_ADAPTER_ID,
   DSHFIND_ENDPOINT,
   DSHFIND_KEY,
@@ -36,6 +30,7 @@ function fixture(path: string): unknown {
 interface MarketServer {
   readonly baseUrl: string
   readonly close: () => Promise<void>
+  readonly logger: { readonly error: ReturnType<typeof vi.fn> }
 }
 
 interface SharedMarketSettings {
@@ -106,14 +101,16 @@ const standardSource = (overrides: Partial<LocalSourceRecord> = {}): LocalSource
 async function startMarketServer(
   initialSources: readonly LocalSourceRecord[],
   sharedSettings?: SharedMarketSettings,
+  updateOverride?: (patch: object) => Promise<void>,
 ): Promise<MarketServer> {
   const routes = new Map<string, RouteHandler>()
   const settings = sharedSettings ?? { document: { sources: initialSources } }
+  const logger = { error: vi.fn() }
   const scope = {
     get: () => settings.document,
-    update: async (patch: object) => {
+    update: updateOverride ?? (async (patch: object) => {
       settings.document = { ...settings.document, ...patch as Partial<MarketSettingsDocument> }
-    },
+    }),
   } as unknown as SettingsScope<MarketSettingsDocument>
   const server = createServer((req, res) => {
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
@@ -141,7 +138,7 @@ async function startMarketServer(
         return () => { routes.delete(route.path) }
       },
     },
-    logger: { error: vi.fn() },
+    logger,
   } as unknown as Context
   const disposeRoutes = registerMarketRoutes(ctx, scope)
   return {
@@ -150,6 +147,7 @@ async function startMarketServer(
       disposeRoutes()
       await closeServer(server)
     },
+    logger,
   }
 }
 
@@ -183,12 +181,6 @@ describe('community market Host routes', () => {
             key: DSH_1024STORE_KEY,
             providerId: DSH_1024STORE_PROVIDER_ID,
             partnership: true,
-          },
-          {
-            key: DSH_MARKETPLACE_KEY,
-            providerId: DSH_MARKETPLACE_PROVIDER_ID,
-            endpoint: DSH_MARKETPLACE_PUBLIC_ENDPOINT,
-            partnership: false,
           },
           {
             key: DSHFIND_KEY,
@@ -333,9 +325,48 @@ describe('community market Host routes', () => {
     }
   })
 
+  it('keeps a successful catalog response when cache persistence fails', async () => {
+    const activeSource = standardSource({ enabled: true, order: 0 })
+    const providerPage = fixture('../docs/examples/catalog-provider-page.example.json') as {
+      readonly items: readonly unknown[]
+      readonly [key: string]: unknown
+    }
+    let requests = 0
+    const getJson = vi.spyOn(restrictedHttpClient, 'getJson').mockImplementation(async () => {
+      requests += 1
+      if (requests === 1) return { value: standardManifest, finalUrl: activeSource.manifestUrl! }
+      return {
+        value: { ...providerPage, page: { total: 1 } },
+        finalUrl: 'https://plugins.example.org/v1/plugins?limit=50',
+      }
+    })
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+    const server = await startMarketServer(
+      [],
+      { document: { sources: [activeSource] } },
+      async () => { throw new Error('simulated settings write failure') },
+    )
+    try {
+      const response = await readRoute(
+        server,
+        `${marketRoutes.catalog}?sourceRecordId=${activeSource.sourceRecordId}&limit=50&locale=en`,
+      )
+      expect(response.status).toBe(200)
+      await expect(response.json()).resolves.toMatchObject({
+        results: [{ snapshot: { items: [{ id: 'better-sidebar' }] } }],
+      })
+      await vi.waitFor(() => expect(server.logger.error).toHaveBeenCalled())
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', unhandled)
+      await server.close()
+      getJson.mockRestore()
+    }
+  })
+
   it.each([
     [DSH_1024STORE_KEY, DSH_1024STORE_ADAPTER_ID, DSH_1024STORE_PROVIDER_ID, 'DSH 1024Store'],
-    [DSH_MARKETPLACE_KEY, DSH_MARKETPLACE_ADAPTER_ID, DSH_MARKETPLACE_PROVIDER_ID, 'DSH Marketplace'],
     [DSHFIND_KEY, DSHFIND_ADAPTER_ID, DSHFIND_PROVIDER_ID, 'dshfind'],
   ] as const)('adds reviewed built-in provider %s as a disabled source', async (key, adapterId, providerId, name) => {
     const server = await startMarketServer([])
@@ -485,31 +516,6 @@ describe('community market Host routes', () => {
         expect.any(AbortSignal),
         { allowedOrigin: 'https://plugins.example.org' },
       )
-    } finally {
-      await server.close()
-    }
-  })
-
-  it('maps the reviewed DSH Marketplace endpoint URL to its built-in adapter', async () => {
-    const getJson = vi.spyOn(restrictedHttpClient, 'getJson')
-    const server = await startMarketServer([])
-    try {
-      const response = await mutateSource(server, {
-        action: 'add-standard',
-        manifestUrl: DSH_MARKETPLACE_PUBLIC_ENDPOINT,
-      })
-
-      expect(response.status).toBe(200)
-      await expect(response.json()).resolves.toMatchObject({
-        sources: [{
-          registrationKind: 'built-in',
-          adapterId: DSH_MARKETPLACE_ADAPTER_ID,
-          providerId: DSH_MARKETPLACE_PROVIDER_ID,
-          builtInProviderKey: DSH_MARKETPLACE_KEY,
-          enabled: false,
-        }],
-      })
-      expect(getJson).not.toHaveBeenCalled()
     } finally {
       await server.close()
     }

@@ -1,0 +1,58 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -36,10 +36,11 @@
+ 		* @param props - Injected sidebar actions plus the sidebar locale seat.
+ 		* @returns the two header controls, or null off macOS desktop.
+ 		*/
+-		function HeaderLeadingControls({ toggleSidebar, startSession, t }) {
++		function HeaderLeadingControls({ toggleSidebar, startSession, t, showNewSession = true }) {
+ 			if (!(0, _deepseek_ai_dsh_client_ui_primitives.isDarwinDesktop)()) return null;
+ 			return (0, react_jsx_runtime.jsxs)("div", {
+ 				className: HeaderLeadingControls_module_css_default.controls,
++				"data-sidebar-header-controls": "",
+ 				children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+ 					label: t("toggle.open"),
+ 					delayMs: 500,
+@@ -52,7 +53,7 @@
+ 						},
+ 						children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPanelLeftOutline16, { size: 16 })
+ 					})
+-				}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
++				}), showNewSession && (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+ 					label: t("session.new.label"),
+ 					delayMs: 500,
+ 					children: (0, react_jsx_runtime.jsx)("button", {
+@@ -478,10 +479,10 @@
+ 				},
+ 				inject: injectProps
+ 			}, SidebarRoot));
+-			ctx.slots.inject("conversation.session.header.leading", () => ctx.slots.register({
+-				name: "conversation.session.header.leading",
++			for (const name of ["conversation.session.header.leading", "conversation.empty.header.leading", "plugins.header.leading"]) ctx.slots.inject(name, () => ctx.slots.register({
++				name,
+ 				locale: NS,
+-				inject: injectProps
++				inject: () => ({ ...injectProps(), showNewSession: name !== "plugins.header.leading" })
+ 			}, HeaderLeadingControls));
+ 			syncPanels();
+ 		}
+diff --git a/lib/types/client/HeaderLeadingControls.d.ts b/lib/types/client/HeaderLeadingControls.d.ts
+--- a/lib/types/client/HeaderLeadingControls.d.ts
++++ b/lib/types/client/HeaderLeadingControls.d.ts
+@@ -1,7 +1,7 @@
+ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+ import type { SidebarRootInjected } from './contract/slots.ts';
+ /** Full props of the conversation-header leading occupant. */
+-export type HeaderLeadingControlsProps = PropsRuntime<'conversation.session.header.leading'> & InjectFace<SidebarRootInjected> & PropsLocale<'sidebar'>;
++export type HeaderLeadingControlsProps = PropsRuntime<'conversation.session.header.leading'> & InjectFace<SidebarRootInjected> & PropsLocale<'sidebar'> & { readonly showNewSession?: boolean };
+ /**
+  * Sidebar-open and New Session controls in the conversation header's leading
+  * seat. On macOS desktop a collapsed sidebar hides entirely (no rail), taking
+@@ -12,5 +12,5 @@
+  * @param props - Injected sidebar actions plus the sidebar locale seat.
+  * @returns the two header controls, or null off macOS desktop.
+  */
+-export declare function HeaderLeadingControls({ toggleSidebar, startSession, t }: HeaderLeadingControlsProps): import("react").JSX.Element | null;
++export declare function HeaderLeadingControls({ toggleSidebar, startSession, t, showNewSession }: HeaderLeadingControlsProps): import("react").JSX.Element | null;
+ //# sourceMappingURL=HeaderLeadingControls.d.ts.map

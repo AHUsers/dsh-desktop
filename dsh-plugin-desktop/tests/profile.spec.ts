@@ -1,9 +1,21 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { composeEntries, initProfile, PROFILE_TEMPLATES } from '@deepseek-ai/dsh-app-boot'
+import {
+  composeEntries,
+  initProfile,
+  PROFILE_TEMPLATES,
+} from '@deepseek-ai/dsh-app-boot'
 import {
   DESKTOP_PACKAGE_NAME,
   desktopShellModeFromSettings,
@@ -76,7 +88,7 @@ describe('desktop profile composition', {
     expect(minimalPreset).toContain("disabled: !!js process.platform !== 'win32'")
   })
 
-  it('reads packaged Cordis skills from the physical unpacked preset root', () => {
+  it('reads packaged Cordis skills from the logical ASAR preset root', () => {
     const home = temporaryHome()
     const resources = join(home, 'resources')
     const archivedPresets = join(
@@ -86,16 +98,9 @@ describe('desktop profile composition', {
       '@deepseek-ai',
       'dsh-agent-presets',
     )
-    const physicalPresetRoot = join(
-      resources,
-      'app.asar.unpacked',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh-agent-presets',
-      'presets',
-    )
+    const archivedPresetRoot = join(archivedPresets, 'presets')
     const skillPath = join(
-      physicalPresetRoot,
+      archivedPresetRoot,
       'cordis',
       'skills',
       'cordis-plugin-development',
@@ -113,7 +118,7 @@ describe('desktop profile composition', {
     const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
     const resolvedRoot = shippedPresetRoot(moduleUrl)
 
-    expect(resolvedRoot).toBe(realpathSync(physicalPresetRoot))
+    expect(resolvedRoot).toBe(realpathSync(archivedPresetRoot))
     expect(readFileSync(join(
       resolvedRoot,
       'cordis',
@@ -127,6 +132,7 @@ describe('desktop profile composition', {
     expect(desktopBundleList([
       '@deepseek-ai/dsh-base',
       'third-party-one',
+      'dsh-plugin-desktop',
       DESKTOP_PACKAGE_NAME,
       'third-party-two',
     ])).toEqual([
@@ -318,8 +324,20 @@ virtualStoreDirMaxLength: 60
     }))
     expect(patches).toContainEqual(expect.objectContaining({
       id: 'agent-presets',
-      config: expect.objectContaining({ roots: [expect.objectContaining({ trust: 'system' })] }),
+      config: expect.objectContaining({
+        roots: [
+          { path: shippedPresetRoot(), trust: 'system' },
+          { path: join(home, '.agent-presets'), trust: 'user' },
+        ],
+        includeUserRoot: false,
+      }),
     }))
+    expect(existsSync(join(
+      prepared.profile.dir,
+      'agent-preset-compat',
+      'code',
+      'agent.cordis.yml',
+    ))).toBe(false)
     expect(readFileSync(prepared.rootConfig, 'utf8')).toBe('[]\n')
     expect(prepared.homeDir).toBe(home)
     expect(fileURLToPath(prepared.bareModuleBaseUrl)).toBe(join(prepared.profile.dir, 'package.json'))
@@ -530,7 +548,7 @@ virtualStoreDirMaxLength: 60
     expect(selected?.packageDir).not.toBe(oldProfileMarketDir)
     expect(JSON.parse(readFileSync(join(selected!.packageDir, 'package.json'), 'utf8'))).toMatchObject({
       name: 'dshmarket',
-      version: '1.17.1',
+      version: '1.38.1',
     })
   })
 
@@ -952,7 +970,11 @@ virtualStoreDirMaxLength: 60
     expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-agent-presets',
       config: expect.objectContaining({
-        roots: [{ path: shippedPresetRoot(), trust: 'system' }],
+        roots: [
+          { path: shippedPresetRoot(), trust: 'system' },
+          { path: join(home, '.agent-presets'), trust: 'user' },
+        ],
+        includeUserRoot: false,
       }),
     }))
     expect(rows.find(row => row.id === 'agent-presets')?.disabled).toBeFalsy()
@@ -1124,5 +1146,76 @@ virtualStoreDirMaxLength: 60
       name: 'third-party-subprocess',
     }))
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
+  })
+})
+
+describe('bundled Agents Anywhere', () => {
+  it('loads the shipped bundle only after explicit opt-in, through its declared bundle and physical Connector paths', () => {
+    const home = temporaryHome()
+    const disabled = prepareDesktopProfile('1', home)
+    expect(disabled.aaEnabled).toBe(false)
+    expect(composeEntries([disabled.patches]).some(row => row.name === '@agents-anywhere/dsh-bridge-next')).toBe(false)
+    const enabled = prepareDesktopProfile('1', home, process.platform, undefined, undefined, undefined, { aaEnabled: true })
+    const aa = composeEntries([enabled.patches]).filter(row => row.name === '@agents-anywhere/dsh-bridge-next' && !row.disabled)
+    expect(aa).toHaveLength(1)
+    expect(enabled.profile.layers.some(layer => layer.packageName === '@agents-anywhere/dsh-bridge-next')).toBe(true)
+    expect(aa[0]?.config).toMatchObject({ dshHome: home })
+    expect(aa[0]?.config).not.toHaveProperty('stateRoot')
+    const config = aa[0]?.config as { connectorSourceDir: string }
+    expect(readFileSync(join(config.connectorSourceDir, 'pyproject.toml'), 'utf8')).toContain('anywhere-cli')
+    expect(prepareDesktopProfile('1', home).aaEnabled).toBe(false)
+  })
+  it('preserves the selected bundle config instead of rebuilding its plugin row', () => {
+    const home = temporaryHome()
+    prepareDesktopProfile('1', home)
+    const packageDir = installBundle(home, '@agents-anywhere/dsh-bridge-next', [
+      '- insert:', '    - id: agents-anywhere-bridge-next', '      name: "@agents-anywhere/dsh-bridge-next"',
+      '      config:', '        apiBaseUrl: "https://aa.example.com"', '        uvPath: "/custom-uv"',
+      '        stateRoot: "/custom-aa-state"', '',
+    ].join('\n'), '99.0.0')
+    writeFileSync(join(packageDir, 'native.patch.yml'), readFileSync(join(packageDir, 'cordis.patch.yml')))
+    rmSync(join(packageDir, 'cordis.patch.yml'))
+    const manifestPath = join(packageDir, 'package.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    manifest.dsh.bundle.patch = './native.patch.yml'
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+    mkdirSync(join(packageDir, 'lib', 'bundled-connector'), { recursive: true })
+    writeFileSync(join(packageDir, 'lib', 'bundled-connector', 'pyproject.toml'), '[project]')
+    const enabled = prepareDesktopProfile('1', home, process.platform, undefined, undefined, undefined, { aaEnabled: true })
+    expect(enabled.aaFailure).toBeUndefined()
+    expect(enabled.profile.layers.find(layer => layer.packageName === '@agents-anywhere/dsh-bridge-next')?.packageDir).toBe(packageDir)
+    const row = composeEntries([enabled.patches]).find(row => row.name === '@agents-anywhere/dsh-bridge-next')!
+    expect(row.config).toMatchObject({ apiBaseUrl: 'https://aa.example.com', uvPath: '/custom-uv', stateRoot: '/custom-aa-state', dshHome: home })
+  })
+  it.each(['missing-patch', 'invalid-yaml', 'invalid-row', 'missing-payload'])('keeps Desktop bootable when the optional AA bundle has %s', failure => {
+    const home = temporaryHome()
+    prepareDesktopProfile('1', home)
+    const packageDir = installBundle(home, '@agents-anywhere/dsh-bridge-next', failure === 'invalid-yaml' ? '['
+      : failure === 'invalid-row' ? '- insert: []\n'
+      : '- insert:\n    - id: agents-anywhere-bridge-next\n      name: "@agents-anywhere/dsh-bridge-next"\n', '99.0.0')
+    if (failure === 'missing-patch') rmSync(join(packageDir, 'cordis.patch.yml'))
+    const prepared = prepareDesktopProfile('1', home, process.platform, undefined, undefined, undefined, { aaEnabled: true })
+    expect(prepared.aaEnabled).toBe(false)
+    expect(prepared.aaFailure).toBeTruthy()
+    expect(composeEntries([prepared.patches]).some(row => row.name === '@agents-anywhere/dsh-bridge-next')).toBe(false)
+    expect(composeEntries([prepared.patches]).some(row => row.id === 'settings')).toBe(true)
+    const disabled = prepareDesktopProfile('1', home)
+    expect(disabled.aaFailure).toBeUndefined()
+    expect(disabled.profile.layers.some(layer => layer.packageName === '@agents-anywhere/dsh-bridge-next')).toBe(false)
+  })
+  it('reports conflicting AA user layers and excludes them recursively while disabled', () => {
+    const home = temporaryHome()
+    prepareDesktopProfile('1', home)
+    writeFileSync(join(home, 'cordis.patch.yml'), '- insert:\n    - id: aa-group\n      group: true\n      config:\n        - id: other-aa\n          name: "@agents-anywhere/dsh-bridge-next"\n')
+    const enabled = prepareDesktopProfile('1', home, process.platform, undefined, undefined, undefined, { aaEnabled: true })
+    expect(enabled.aaEnabled).toBe(false)
+    expect(enabled.aaFailure).toContain('conflicting AA')
+    expect(JSON.stringify(enabled.patches)).not.toContain('@agents-anywhere/dsh-bridge-next')
+  })
+  it('does not let a user patch enable AA while Desktop selection is off', () => {
+    const home = temporaryHome()
+    writeFileSync(join(home, 'cordis.patch.yml'), '- insert:\n    - id: custom-aa\n      name: "@agents-anywhere/dsh-bridge-next"\n')
+    const prepared = prepareDesktopProfile('1', home)
+    expect(composeEntries([prepared.patches]).filter(row => row.name === '@agents-anywhere/dsh-bridge-next').every(row => row.disabled)).toBe(true)
   })
 })
